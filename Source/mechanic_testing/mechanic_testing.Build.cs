@@ -12,6 +12,7 @@ public class mechanic_testing : ModuleRules
 			"CoreUObject",
 			"Engine",
 			"InputCore",
+				"EnhancedInput",
 			"AIModule",
 			"NavigationSystem"
 		});

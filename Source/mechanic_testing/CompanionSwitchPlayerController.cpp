@@ -1,9 +1,13 @@
 #include "CompanionSwitchPlayerController.h"
 
 #include "AIController.h"
+#include "EnhancedInputSubsystems.h"
 #include "EngineUtils.h"
+#include "Engine/LocalPlayer.h"
 #include "GameFramework/Character.h"
 #include "InputCoreTypes.h"
+#include "InputMappingContext.h"
+#include "UObject/ConstructorHelpers.h"
 
 ACompanionSwitchPlayerController::ACompanionSwitchPlayerController()
 {
@@ -12,12 +16,17 @@ ACompanionSwitchPlayerController::ACompanionSwitchPlayerController()
 	bAutoDiscoverCharacters = true;
 	CompanionTag = TEXT("CompanionCharacter");
 	SwitchCharacterKey = EKeys::Tab;
+	InputMappingPriority = 0;
 	FollowAcceptanceRadius = 250.0f;
 	FollowRefreshInterval = 0.25f;
 	bLogCompanionSetup = false;
 
 	ControlledCompanionIndex = INDEX_NONE;
 	TimeSinceLastFollowUpdate = 0.0f;
+
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> MappingContextFinder(
+		TEXT("/Game/ThirdPerson/Input/IMC_Default.IMC_Default"));
+	DefaultInputMappingContext = MappingContextFinder.Object;
 }
 
 void ACompanionSwitchPlayerController::BeginPlay()
@@ -25,6 +34,15 @@ void ACompanionSwitchPlayerController::BeginPlay()
 	Super::BeginPlay();
 
 	InitializeCompanions();
+
+	if (DefaultInputMappingContext)
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* InputSubsystem =
+			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+		{
+			InputSubsystem->AddMappingContext(DefaultInputMappingContext, InputMappingPriority);
+		}
+	}
 }
 
 void ACompanionSwitchPlayerController::Tick(float DeltaSeconds)

@@ -7,6 +7,7 @@
 
 class AAIController;
 class ACharacter;
+class UInputMappingContext;
 
 UCLASS(Blueprintable)
 class MECHANIC_TESTING_API ACompanionSwitchPlayerController : public APlayerController
@@ -43,6 +44,12 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Companion|Input")
 	FKey SwitchCharacterKey;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Companion|Input")
+	TObjectPtr<UInputMappingContext> DefaultInputMappingContext;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Companion|Input")
+	int32 InputMappingPriority;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Companion|Follow", meta = (ClampMin = "50.0", UIMin = "50.0"))
 	float FollowAcceptanceRadius;
