@@ -1,0 +1,210 @@
+#include "CompanionSwitchPlayerController.h"
+
+#include "AIController.h"
+#include "EngineUtils.h"
+#include "GameFramework/Character.h"
+#include "InputCoreTypes.h"
+
+ACompanionSwitchPlayerController::ACompanionSwitchPlayerController()
+{
+	PrimaryActorTick.bCanEverTick = true;
+
+	bAutoDiscoverCharacters = true;
+	CompanionTag = TEXT("CompanionCharacter");
+	SwitchCharacterKey = EKeys::Tab;
+	FollowAcceptanceRadius = 250.0f;
+	FollowRefreshInterval = 0.25f;
+	bLogCompanionSetup = false;
+
+	ControlledCompanionIndex = INDEX_NONE;
+	TimeSinceLastFollowUpdate = 0.0f;
+}
+
+void ACompanionSwitchPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+
+	InitializeCompanions();
+}
+
+void ACompanionSwitchPlayerController::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (WasInputKeyJustPressed(SwitchCharacterKey))
+	{
+		SwitchControlledCharacter();
+	}
+
+	TimeSinceLastFollowUpdate += DeltaSeconds;
+	if (TimeSinceLastFollowUpdate >= FollowRefreshInterval)
+	{
+		TimeSinceLastFollowUpdate = 0.0f;
+		UpdateFollowerMove();
+	}
+}
+
+void ACompanionSwitchPlayerController::InitializeCompanions()
+{
+	EnsureTwoCompanions();
+
+	if (CompanionCharacters.Num() < 2)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Companion setup needs two characters. Found %d."), CompanionCharacters.Num());
+		return;
+	}
+
+	const int32 ExistingPawnIndex = CompanionCharacters.IndexOfByKey(Cast<ACharacter>(GetPawn()));
+	PossessCompanionAtIndex(ExistingPawnIndex != INDEX_NONE ? ExistingPawnIndex : 0);
+}
+
+void ACompanionSwitchPlayerController::SwitchControlledCharacter()
+{
+	if (CompanionCharacters.Num() < 2)
+	{
+		InitializeCompanions();
+	}
+
+	if (CompanionCharacters.Num() < 2)
+	{
+		return;
+	}
+
+	const int32 NextIndex = ControlledCompanionIndex == 0 ? 1 : 0;
+	PossessCompanionAtIndex(NextIndex);
+}
+
+ACharacter* ACompanionSwitchPlayerController::GetControlledCompanion() const
+{
+	return GetCompanionAtIndex(ControlledCompanionIndex);
+}
+
+ACharacter* ACompanionSwitchPlayerController::GetFollowerCompanion() const
+{
+	if (CompanionCharacters.Num() < 2 || ControlledCompanionIndex == INDEX_NONE)
+	{
+		return nullptr;
+	}
+
+	return GetCompanionAtIndex(ControlledCompanionIndex == 0 ? 1 : 0);
+}
+
+void ACompanionSwitchPlayerController::EnsureTwoCompanions()
+{
+	CompanionCharacters.RemoveAll([](const ACharacter* Character)
+	{
+		return !IsValid(Character);
+	});
+
+	if (!bAutoDiscoverCharacters || CompanionCharacters.Num() >= 2)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	for (TActorIterator<ACharacter> It(World); It; ++It)
+	{
+		ACharacter* Character = *It;
+		if (!IsValid(Character) || CompanionCharacters.Contains(Character))
+		{
+			continue;
+		}
+
+		if (!CompanionTag.IsNone() && !Character->ActorHasTag(CompanionTag))
+		{
+			continue;
+		}
+
+		CompanionCharacters.Add(Character);
+		if (CompanionCharacters.Num() >= 2)
+		{
+			break;
+		}
+	}
+
+	if (CompanionCharacters.Num() < 2)
+	{
+		if (ACharacter* CurrentCharacter = Cast<ACharacter>(GetPawn()))
+		{
+			CompanionCharacters.AddUnique(CurrentCharacter);
+		}
+	}
+
+	if (bLogCompanionSetup)
+	{
+		UE_LOG(LogTemp, Log, TEXT("Companion setup found %d characters."), CompanionCharacters.Num());
+	}
+}
+
+void ACompanionSwitchPlayerController::PossessCompanionAtIndex(int32 NewIndex)
+{
+	ACharacter* NewControlledCharacter = GetCompanionAtIndex(NewIndex);
+	if (!NewControlledCharacter)
+	{
+		return;
+	}
+
+	ACharacter* OldControlledCharacter = GetControlledCompanion();
+	if (OldControlledCharacter && OldControlledCharacter != NewControlledCharacter)
+	{
+		UnPossess();
+		EnsureAIController(OldControlledCharacter);
+	}
+
+	ControlledCompanionIndex = NewIndex;
+	Possess(NewControlledCharacter);
+
+	UpdateFollowerMove();
+}
+
+void ACompanionSwitchPlayerController::UpdateFollowerMove()
+{
+	ACharacter* Leader = GetControlledCompanion();
+	ACharacter* Follower = GetFollowerCompanion();
+	if (!Leader || !Follower)
+	{
+		return;
+	}
+
+	AAIController* FollowerController = EnsureAIController(Follower);
+	if (!FollowerController)
+	{
+		return;
+	}
+
+	const float DistanceSquared = FVector::DistSquared(Leader->GetActorLocation(), Follower->GetActorLocation());
+	const float StopDistance = FMath::Max(FollowAcceptanceRadius, 1.0f);
+	if (DistanceSquared <= FMath::Square(StopDistance))
+	{
+		FollowerController->StopMovement();
+		return;
+	}
+
+	FollowerController->MoveToActor(Leader, FollowAcceptanceRadius, true, true, true, nullptr, true);
+}
+
+AAIController* ACompanionSwitchPlayerController::EnsureAIController(ACharacter* Character) const
+{
+	if (!Character)
+	{
+		return nullptr;
+	}
+
+	if (AAIController* ExistingController = Cast<AAIController>(Character->GetController()))
+	{
+		return ExistingController;
+	}
+
+	Character->SpawnDefaultController();
+	return Cast<AAIController>(Character->GetController());
+}
+
+ACharacter* ACompanionSwitchPlayerController::GetCompanionAtIndex(int32 Index) const
+{
+	return CompanionCharacters.IsValidIndex(Index) ? CompanionCharacters[Index] : nullptr;
+}

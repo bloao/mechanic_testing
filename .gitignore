@@ -1,0 +1,15 @@
+# Unreal generated files
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+
+# IDE and operating-system files
+.vs/
+.vscode/
+.idea/
+*.sln
+*.xcworkspace/
+*.xcodeproj/
+.DS_Store
+
