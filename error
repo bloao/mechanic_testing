@@ -1,0 +1,18 @@
+PS C:\Users\hsjbutt2\Documents> https://github.com/bloao/mechanic_testing.git
+https://github.com/bloao/mechanic_testing.git : The term 'https://github.com/bloao/mechanic_testing.git' is not
+recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if
+a path was included, verify that the path is correct and try again.
+At line:1 char:1
++ https://github.com/bloao/mechanic_testing.git
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (https://github....nic_testing.git:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\Users\hsjbutt2\Documents> gh repo clone bloao/mechanic_testing
+gh : The term 'gh' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:1 char:1
++ gh repo clone bloao/mechanic_testing
++ ~~
+    + CategoryInfo          : ObjectNotFound: (gh:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
