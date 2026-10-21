@@ -57,6 +57,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Companion|Follow", meta = (ClampMin = "0.05", UIMin = "0.05"))
 	float FollowRefreshInterval;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Companion|Abilities", meta = (ClampMin = "0", UIMin = "0", ClampMax = "1", UIMax = "1"))
+	int32 AgileCompanionIndex;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Companion|Abilities", meta = (ClampMin = "2", UIMin = "2"))
+	int32 AgileJumpMaxCount;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Companion|Debug")
 	bool bLogCompanionSetup;
 
@@ -65,6 +71,7 @@ private:
 	float TimeSinceLastFollowUpdate;
 
 	void EnsureTwoCompanions();
+	void ApplyCompanionAbilitySettings();
 	void PossessCompanionAtIndex(int32 NewIndex);
 	void UpdateFollowerMove();
 	AAIController* EnsureAIController(ACharacter* Character) const;
