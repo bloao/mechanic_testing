@@ -27,7 +27,7 @@ ACompanionSwitchPlayerController::ACompanionSwitchPlayerController()
 	TimeSinceLastFollowUpdate = 0.0f;
 
 	static ConstructorHelpers::FObjectFinder<UInputMappingContext> MappingContextFinder(
-		TEXT("/Game/ThirdPerson/Input/IMC_Default.IMC_Default"));
+		TEXT("/Game/Input/IMC_Default.IMC_Default"));
 	DefaultInputMappingContext = MappingContextFinder.Object;
 }
 
