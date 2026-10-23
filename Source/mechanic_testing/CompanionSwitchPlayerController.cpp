@@ -19,13 +19,15 @@ ACompanionSwitchPlayerController::ACompanionSwitchPlayerController()
 	InputMappingPriority = 0;
 	FollowAcceptanceRadius = 250.0f;
 	FollowRefreshInterval = 0.25f;
+	AgileCompanionIndex = 0;
+	AgileJumpMaxCount = 2;
 	bLogCompanionSetup = false;
 
 	ControlledCompanionIndex = INDEX_NONE;
 	TimeSinceLastFollowUpdate = 0.0f;
 
 	static ConstructorHelpers::FObjectFinder<UInputMappingContext> MappingContextFinder(
-		TEXT("/Game/ThirdPerson/Input/IMC_Default.IMC_Default"));
+		TEXT("/Game/Input/IMC_Default.IMC_Default"));
 	DefaultInputMappingContext = MappingContextFinder.Object;
 }
 
@@ -71,6 +73,8 @@ void ACompanionSwitchPlayerController::InitializeCompanions()
 		UE_LOG(LogTemp, Warning, TEXT("Companion setup needs two characters. Found %d."), CompanionCharacters.Num());
 		return;
 	}
+
+	ApplyCompanionAbilitySettings();
 
 	const int32 ExistingPawnIndex = CompanionCharacters.IndexOfByKey(Cast<ACharacter>(GetPawn()));
 	PossessCompanionAtIndex(ExistingPawnIndex != INDEX_NONE ? ExistingPawnIndex : 0);
@@ -156,6 +160,20 @@ void ACompanionSwitchPlayerController::EnsureTwoCompanions()
 	if (bLogCompanionSetup)
 	{
 		UE_LOG(LogTemp, Log, TEXT("Companion setup found %d characters."), CompanionCharacters.Num());
+	}
+}
+
+void ACompanionSwitchPlayerController::ApplyCompanionAbilitySettings()
+{
+	const int32 ValidAgileIndex = FMath::Clamp(AgileCompanionIndex, 0, 1);
+	for (int32 Index = 0; Index < CompanionCharacters.Num(); ++Index)
+	{
+		if (ACharacter* Character = CompanionCharacters[Index])
+		{
+			Character->JumpMaxCount = Index == ValidAgileIndex
+				? FMath::Max(AgileJumpMaxCount, 2)
+				: 1;
+		}
 	}
 }
 
