@@ -92,7 +92,7 @@ namespace CompanionWallRunTests
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionWallRunEligibilityTest,
-	"MechanicTesting.WallRun.Eligibility", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+	"MechanicTesting.WallRun.Eligibility", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
 
 bool FCompanionWallRunEligibilityTest::RunTest(const FString& Parameters)
 {
@@ -139,7 +139,7 @@ bool FCompanionWallRunEligibilityTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionWallRunExitTest,
-	"MechanicTesting.WallRun.JumpAndPossession", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+	"MechanicTesting.WallRun.JumpAndPossession", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
 
 bool FCompanionWallRunExitTest::RunTest(const FString& Parameters)
 {
@@ -172,7 +172,7 @@ bool FCompanionWallRunExitTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionWallRunDurationTest,
-	"MechanicTesting.WallRun.DurationAndLanding", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+	"MechanicTesting.WallRun.DurationAndLanding", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
 
 bool FCompanionWallRunDurationTest::RunTest(const FString& Parameters)
 {
