@@ -1,6 +1,6 @@
-Set-Location "\\mfs04\user04\HSRAMIN3\Documents\Unreal Projects"
+Set-Location "$env:USERPROFILE"
 git lfs install
-git clone --branch main --single-branch https://github.com/bloao/mechanic_testing.git mechanic_testing-main-clean
-Set-Location ".\mechanic_testing-main-clean"
+git clone --branch main --single-branch https://github.com/bloao/mechanic_testing.git mechanic_testing-combined
+Set-Location ".\mechanic_testing-combined"
 git lfs pull
 explorer .
