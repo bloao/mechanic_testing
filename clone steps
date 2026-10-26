@@ -1,5 +1,4 @@
-New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\UnrealProjects" | Out-Null
-Set-Location "$env:LOCALAPPDATA\UnrealProjects"
+Set-Location "\\mfs04\user04\HSRAMIN3\Documents\Unreal Projects"
 git lfs install
 git clone --branch main --single-branch https://github.com/bloao/mechanic_testing.git mechanic_testing-main-clean
 Set-Location ".\mechanic_testing-main-clean"
