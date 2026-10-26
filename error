@@ -1,31 +1,5 @@
-Running C:/Program Files/Epic Games/UE_5.6/Engine/Build/BatchFiles/Build.bat Development Win64 -Project="//mfs04/user04/HSRAMIN3/Documents/Unreal Projects/mechanic_testing-main-clean 5.6/mechanic_testing.uproject" -TargetType=Editor -Progress -NoEngineChanges -NoHotReloadFromIDE
-Using bundled DotNet SDK version: 8.0.300 win-x64
-Running UnrealBuildTool: dotnet "..\..\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.dll" Development Win64 -Project="//mfs04/user04/HSRAMIN3/Documents/Unreal Projects/mechanic_testing-main-clean 5.6/mechanic_testing.uproject" -TargetType=Editor -Progress -NoEngineChanges -NoHotReloadFromIDE
-Log file: C:\Users\hsramin3\AppData\Local\UnrealBuildTool\Log.txt
-Available x64 toolchains (1):
- * C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231
-    (Family=14.51.36231, FamilyRank=1, Version=14.51.36260, HostArchitecture=x64, ReleaseChannel=Latest, Architecture=x64)
-Visual Studio 2022 compiler version 14.51.36260 is not a preferred version. Please use the latest preferred version 14.38.33130
-Using 'git status' to determine working set for adaptive non-unity build (\\mfs04\user04\HSRAMIN3\Documents\Unreal Projects\mechanic_testing-main-clean 5.6).
-Creating makefile for mechanic_testingEditor (no existing makefile)
-@progress push 5%
-Parsing headers for mechanic_testingEditor
-  Running Internal UnrealHeaderTool "\\mfs04\user04\HSRAMIN3\Documents\Unreal Projects\mechanic_testing-main-clean 5.6\mechanic_testing.uproject" "\\mfs04\user04\HSRAMIN3\Documents\Unreal Projects\mechanic_testing-main-clean 5.6\Intermediate\Build\Win64\mechanic_testingEditor\Development\mechanic_testingEditor.uhtmanifest" -WarningsAsErrors -installed
-Total of 10 written
-Reflection code generated for mechanic_testingEditor in 1.4430592 seconds
-@progress pop
-Building mechanic_testingEditor...
-Using Visual Studio 2022 14.51.36260 toolchain (C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231) and Windows 10.0.26100.0 SDK (C:\Program Files (x86)\Windows Kits\10).
-Warning: Visual Studio 2022 compiler is not a preferred version
-Determining max actions to execute in parallel (12 physical cores, 20 logical cores)
-  Executing up to 12 processes, one per physical core
-  Requested 1.5 GB memory per action, 4.23 GB available: limiting max parallel actions to 2
-Using Parallel executor to run 11 action(s)
------- Building 11 action(s) started ------
-[1/11] Resource Default.rc2
-[2/11] Compile [x64] cl : Command line warning D9002 : ignoring unknown option '//mfs04/user04/HSRAMIN3/Documents/Unreal Projects/mechanic_testing-main-clean 5.6/Intermediate/Build/Win64/x64/mechanic_testingEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.cpp'
-cl : Command line error D8003 : missing source filename
-Total time in Parallel executor: 0.53 seconds
+$src = "\\mfs04\user04\HSRAMIN3\Documents\Unreal Projects\mechanic_testing-main-clean 5.6"
+$dst = "$env:LOCALAPPDATA\UnrealProjects\mechanic_testing-local"
 
-Result: Failed (OtherCompilationError)
-Total execution time: 6.92 seconds
+robocopy $src $dst /E /XD Binaries Intermediate Saved DerivedDataCache .vs /R:1 /W:1
+explorer $dst
