@@ -12,10 +12,16 @@ class MECHANIC_TESTING_API ACompanionCharacterBase : public ACharacter
 	GENERATED_BODY()
 
 public:
-	ACompanionCharacterBase();
+	ACompanionCharacterBase(const FObjectInitializer& ObjectInitializer);
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+	virtual void Jump() override;
+	virtual void StopJumping() override;
+	virtual void UnPossessed() override;
+
+	UFUNCTION(BlueprintCallable, Category = "Abilities")
+	void ConfigureAgileAbilities(bool bIsAgile, int32 AgileJumpCount = 2);
 
 	UFUNCTION(BlueprintCallable, Category = "Abilities|Smash")
 	bool PerformSmash();
@@ -50,6 +56,7 @@ protected:
 
 private:
 	double LastSmashTime;
+	bool bJumpInputHeld = false;
 
 	void ApplyJumpSettings();
 	void HandleSmashInput();

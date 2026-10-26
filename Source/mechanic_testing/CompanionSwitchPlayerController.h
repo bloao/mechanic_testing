@@ -74,6 +74,6 @@ private:
 	void ApplyCompanionAbilitySettings();
 	void PossessCompanionAtIndex(int32 NewIndex);
 	void UpdateFollowerMove();
-	AAIController* EnsureAIController(ACharacter* Character) const;
+	AAIController* EnsureAIController(ACharacter* CompanionPawn) const;
 	ACharacter* GetCompanionAtIndex(int32 Index) const;
 };

@@ -1,5 +1,6 @@
 #include "CompanionCharacterBase.h"
 
+#include "CompanionCharacterMovementComponent.h"
 #include "CollisionQueryParams.h"
 #include "Components/InputComponent.h"
 #include "Engine/EngineTypes.h"
@@ -8,7 +9,8 @@
 #include "InputAction.h"
 #include "SmashableInterface.h"
 
-ACompanionCharacterBase::ACompanionCharacterBase()
+ACompanionCharacterBase::ACompanionCharacterBase(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<UCompanionCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
 	bCanDoubleJump = false;
 	MaxJumpCount = 2;
@@ -25,6 +27,57 @@ void ACompanionCharacterBase::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	ApplyJumpSettings();
+}
+
+void ACompanionCharacterBase::ConfigureAgileAbilities(bool bIsAgile, int32 AgileJumpCount)
+{
+	bCanDoubleJump = bIsAgile;
+	MaxJumpCount = FMath::Max(AgileJumpCount, 2);
+	ApplyJumpSettings();
+	if (UCompanionCharacterMovementComponent* Movement = Cast<UCompanionCharacterMovementComponent>(GetCharacterMovement()))
+	{
+		Movement->SetWallRunEnabled(bIsAgile);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("WallRun [%s]: movement component is %s, not CompanionCharacterMovementComponent. Recompile the character Blueprint after restarting the editor."),
+			*GetName(), *GetNameSafe(GetCharacterMovement()->GetClass()));
+	}
+}
+
+void ACompanionCharacterBase::Jump()
+{
+	if (bJumpInputHeld)
+	{
+		return;
+	}
+	bJumpInputHeld = true;
+	if (UCompanionCharacterMovementComponent* Movement = Cast<UCompanionCharacterMovementComponent>(GetCharacterMovement()))
+	{
+		// Unreal clears bPressedJump itself; track the physical press until StopJumping.
+		if (Movement->JumpOffWall())
+		{
+			Super::StopJumping();
+			return;
+		}
+	}
+	Super::Jump();
+}
+
+void ACompanionCharacterBase::StopJumping()
+{
+	bJumpInputHeld = false;
+	Super::StopJumping();
+}
+
+void ACompanionCharacterBase::UnPossessed()
+{
+	StopJumping();
+	if (UCompanionCharacterMovementComponent* Movement = Cast<UCompanionCharacterMovementComponent>(GetCharacterMovement()))
+	{
+		Movement->StopWallRun();
+	}
+	Super::UnPossessed();
 }
 
 void ACompanionCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

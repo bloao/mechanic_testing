@@ -1,6 +1,7 @@
 #include "CompanionSwitchPlayerController.h"
 
 #include "AIController.h"
+#include "CompanionCharacterBase.h"
 #include "EnhancedInputSubsystems.h"
 #include "EngineUtils.h"
 #include "Engine/LocalPlayer.h"
@@ -113,9 +114,9 @@ ACharacter* ACompanionSwitchPlayerController::GetFollowerCompanion() const
 
 void ACompanionSwitchPlayerController::EnsureTwoCompanions()
 {
-	CompanionCharacters.RemoveAll([](const ACharacter* Character)
+	CompanionCharacters.RemoveAll([](const ACharacter* CompanionPawn)
 	{
-		return !IsValid(Character);
+		return !IsValid(CompanionPawn);
 	});
 
 	if (!bAutoDiscoverCharacters || CompanionCharacters.Num() >= 2)
@@ -131,18 +132,18 @@ void ACompanionSwitchPlayerController::EnsureTwoCompanions()
 
 	for (TActorIterator<ACharacter> It(World); It; ++It)
 	{
-		ACharacter* Character = *It;
-		if (!IsValid(Character) || CompanionCharacters.Contains(Character))
+		ACharacter* CompanionPawn = *It;
+		if (!IsValid(CompanionPawn) || CompanionCharacters.Contains(CompanionPawn))
 		{
 			continue;
 		}
 
-		if (!CompanionTag.IsNone() && !Character->ActorHasTag(CompanionTag))
+		if (!CompanionTag.IsNone() && !CompanionPawn->ActorHasTag(CompanionTag))
 		{
 			continue;
 		}
 
-		CompanionCharacters.Add(Character);
+		CompanionCharacters.Add(CompanionPawn);
 		if (CompanionCharacters.Num() >= 2)
 		{
 			break;
@@ -168,11 +169,18 @@ void ACompanionSwitchPlayerController::ApplyCompanionAbilitySettings()
 	const int32 ValidAgileIndex = FMath::Clamp(AgileCompanionIndex, 0, 1);
 	for (int32 Index = 0; Index < CompanionCharacters.Num(); ++Index)
 	{
-		if (ACharacter* Character = CompanionCharacters[Index])
+		if (ACharacter* CompanionPawn = CompanionCharacters[Index])
 		{
-			Character->JumpMaxCount = Index == ValidAgileIndex
-				? FMath::Max(AgileJumpMaxCount, 2)
-				: 1;
+			const bool bIsAgile = Index == ValidAgileIndex;
+			if (ACompanionCharacterBase* Companion = Cast<ACompanionCharacterBase>(CompanionPawn))
+			{
+				Companion->ConfigureAgileAbilities(bIsAgile, AgileJumpMaxCount);
+			}
+			else
+			{
+				CompanionPawn->JumpMaxCount = bIsAgile ? FMath::Max(AgileJumpMaxCount, 2) : 1;
+				UE_LOG(LogTemp, Warning, TEXT("%s needs CompanionCharacterBase as its parent for wall running."), *CompanionPawn->GetName());
+			}
 		}
 	}
 }
@@ -224,20 +232,20 @@ void ACompanionSwitchPlayerController::UpdateFollowerMove()
 	FollowerController->MoveToActor(Leader, FollowAcceptanceRadius, true, true, true, nullptr, true);
 }
 
-AAIController* ACompanionSwitchPlayerController::EnsureAIController(ACharacter* Character) const
+AAIController* ACompanionSwitchPlayerController::EnsureAIController(ACharacter* CompanionPawn) const
 {
-	if (!Character)
+	if (!CompanionPawn)
 	{
 		return nullptr;
 	}
 
-	if (AAIController* ExistingController = Cast<AAIController>(Character->GetController()))
+	if (AAIController* ExistingController = Cast<AAIController>(CompanionPawn->GetController()))
 	{
 		return ExistingController;
 	}
 
-	Character->SpawnDefaultController();
-	return Cast<AAIController>(Character->GetController());
+	CompanionPawn->SpawnDefaultController();
+	return Cast<AAIController>(CompanionPawn->GetController());
 }
 
 ACharacter* ACompanionSwitchPlayerController::GetCompanionAtIndex(int32 Index) const
