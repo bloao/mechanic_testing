@@ -1,4 +1,98 @@
-& "C:\Program Files\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat" mechanic_testingEditor Win64 Development "-Project=C:\Users\hsramin3\mechanic_testing\mechanic_testing.uproject" -WaitMutex -NoEngineChanges -NoHotReloadFromIDE
+PS C:\Users\hsramin3> & "C:\Program Files\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat" mechanic_testingEditor Win64 Development "-Project=C:\Users\hsramin3\mechanic_testing\mechanic_testing.uproject" -WaitMutex -NoEngineChanges -NoHotReloadFromIDE
+Using bundled DotNet SDK version: 8.0.300 win-x64
+Running UnrealBuildTool: dotnet "..\..\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.dll" mechanic_testingEditor Win64 Development -Project=C:\Users\hsramin3\mechanic_testing\mechanic_testing.uproject -WaitMutex -NoEngineChanges -NoHotReloadFromIDE
+Log file: C:\Users\hsramin3\AppData\Local\UnrealBuildTool\Log.txt
+Using 'git status' to determine working set for adaptive non-unity build (C:\Users\hsramin3\mechanic_testing).
+Waiting for 'git status' command to complete
+Building mechanic_testingEditor...
+Using Visual Studio 2022 14.51.36260 toolchain (C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231) and Windows 10.0.26100.0 SDK (C:\Program Files (x86)\Windows Kits\10).
+Warning: Visual Studio 2022 compiler is not a preferred version
+Determining max actions to execute in parallel (12 physical cores, 20 logical cores)
+  Executing up to 12 processes, one per physical core
+  Requested 1.5 GB memory per action, 15.68 GB available: limiting max parallel actions to 10
+Using Parallel executor to run 4 action(s)
+------ Building 4 action(s) started ------
+[1/4] Compile [x64] CompanionSwitchPlayerController.cpp
+C:\Users\hsramin3\mechanic_testing\Source\mechanic_testing\CompanionSwitchPlayerController.cpp(94,53): error C4458: declaration of 'Character' hides class member
+        CompanionCharacters.RemoveAll([](const ACharacter* Character)
+                                                           ^
+C:\Program Files\Epic Games\UE_5.6\Engine\Source\Runtime\Engine\Classes\GameFramework\Controller.h(82,25): note: see declaration of 'AController::Character'
+        TObjectPtr<ACharacter> Character;
+                               ^
+C:\Users\hsramin3\mechanic_testing\Source\mechanic_testing\CompanionSwitchPlayerController.cpp(112,15): error C4458: declaration of 'Character' hides class member
+                ACharacter* Character = *It;
+                            ^
+C:\Program Files\Epic Games\UE_5.6\Engine\Source\Runtime\Engine\Classes\GameFramework\Controller.h(82,25): note: see declaration of 'AController::Character'
+        TObjectPtr<ACharacter> Character;
+                               ^
+C:\Users\hsramin3\mechanic_testing\Source\mechanic_testing\CompanionSwitchPlayerController.cpp(191,81): error C4458: declaration of 'Character' hides class member
+AAIController* ACompanionSwitchPlayerController::EnsureAIController(ACharacter* Character) const
+                                                                                ^
+C:\Program Files\Epic Games\UE_5.6\Engine\Source\Runtime\Engine\Classes\GameFramework\Controller.h(82,25): note: see declaration of 'AController::Character'
+        TObjectPtr<ACharacter> Character;
+                               ^
+Total time in Parallel executor: 0.85 seconds
 
+Result: Failed (OtherCompilationError)
+Total execution time: 2.92 seconds
+PS C:\Users\hsramin3> Get-Content "$env:LOCALAPPDATA\UnrealBuildTool\Log.txt" -Tail 60
+Generated code is up to date.
+mechanic_testingEditor.target: Produced item "C:\Users\hsramin3\mechanic_testing\Binaries\Win64\UnrealEditor.modules" doesn't exist.
+mechanic_testingEditor.target: Produced item "C:\Users\hsramin3\mechanic_testing\Binaries\Win64\mechanic_testingEditor.target" doesn't exist.
+UnrealEditor-mechanic_testing.dll: Produced item "C:\Users\hsramin3\mechanic_testing\Binaries\Win64\UnrealEditor-mechanic_testing.dll" doesn't exist.
+UnrealEditor-mechanic_testing.lib: Produced item "C:\Users\hsramin3\mechanic_testing\Intermediate\Build\Win64\x64\UnrealEditor\Development\mechanic_testing\UnrealEditor-mechanic_testing.lib" doesn't exist.
+UnrealEditor-mechanic_testing.dll: Produced item "C:\Users\hsramin3\mechanic_testing\Binaries\Win64\UnrealEditor-mechanic_testing.pdb" doesn't exist.
+CompanionSwitchPlayerController.cpp: Produced item "C:\Users\hsramin3\mechanic_testing\Intermediate\Build\Win64\x64\UnrealEditor\Development\mechanic_testing\CompanionSwitchPlayerController.cpp.obj" doesn't exist.
+Building mechanic_testingEditor...
+Using Visual Studio 2022 14.51.36260 toolchain (C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231) and Windows 10.0.26100.0 SDK (C:\Program Files (x86)\Windows Kits\10).
+Warning: Visual Studio 2022 compiler is not a preferred version
+Determining max actions to execute in parallel (12 physical cores, 20 logical cores)
+  Executing up to 12 processes, one per physical core
+  Requested 1.5 GB memory per action, 15.68 GB available: limiting max parallel actions to 10
+Using Parallel executor to run 4 action(s)
+------ Building 4 action(s) started ------
+[1/4] Compile [x64] CompanionSwitchPlayerController.cpp
+C:\Users\hsramin3\mechanic_testing\Source\mechanic_testing\CompanionSwitchPlayerController.cpp(94,53): error C4458: declaration of 'Character' hides class member
+        CompanionCharacters.RemoveAll([](const ACharacter* Character)
+                                                           ^
+C:\Program Files\Epic Games\UE_5.6\Engine\Source\Runtime\Engine\Classes\GameFramework\Controller.h(82,25): note: see declaration of 'AController::Character'
+        TObjectPtr<ACharacter> Character;
+                               ^
+C:\Users\hsramin3\mechanic_testing\Source\mechanic_testing\CompanionSwitchPlayerController.cpp(112,15): error C4458: declaration of 'Character' hides class member
+                ACharacter* Character = *It;
+                            ^
+C:\Program Files\Epic Games\UE_5.6\Engine\Source\Runtime\Engine\Classes\GameFramework\Controller.h(82,25): note: see declaration of 'AController::Character'
+        TObjectPtr<ACharacter> Character;
+                               ^
+ Compile [x64] CompanionSwitchPlayerController.cpp: Exited with error code 2 . The build will fail.
+ Compile [x64] CompanionSwitchPlayerController.cpp: WorkingDirectory C:\Program Files\Epic Games\UE_5.6\Engine\Source
+ Compile [x64] CompanionSwitchPlayerController.cpp: C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64\cl.exe @"C:/Users/hsramin3/mechanic_testing/Intermediate/Build/Win64/x64/UnrealEditor/Development/mechanic_testing/CompanionSwitchPlayerController.cpp.obj.rsp"
+C:\Users\hsramin3\mechanic_testing\Source\mechanic_testing\CompanionSwitchPlayerController.cpp(191,81): error C4458: declaration of 'Character' hides class member
+AAIController* ACompanionSwitchPlayerController::EnsureAIController(ACharacter* Character) const
+                                                                                ^
+C:\Program Files\Epic Games\UE_5.6\Engine\Source\Runtime\Engine\Classes\GameFramework\Controller.h(82,25): note: see declaration of 'AController::Character'
+        TObjectPtr<ACharacter> Character;
+                               ^
+Total time in Parallel executor: 0.85 seconds
+CompilationResultException: OtherCompilationError
+   at UnrealBuildTool.ActionGraph.ExecuteActionsAsync(BuildConfiguration BuildConfiguration, List`1 ActionsToExecute, List`1 TargetDescriptors, ILogger Logger, IActionArtifactCache actionArtifactCache)
+   at UnrealBuildTool.BuildMode.BuildAsync(TargetMakefile[] Makefiles, List`1 TargetDescriptors, BuildConfiguration BuildConfiguration, BuildOptions Options, FileReference WriteOutdatedActionsFile, ILogger Logger, String ActionTypeFilter)
+   at UnrealBuildTool.BuildMode.BuildAsync(List`1 TargetDescriptors, BuildConfiguration BuildConfiguration, ISourceFileWorkingSet WorkingSet, BuildOptions Options, FileReference WriteOutdatedActionsFile, ILogger Logger, Boolean bSkipPreBuildTargets, String ActionTypeFilter)
+   at UnrealBuildTool.BuildMode.ExecuteAsync(CommandLineArguments Arguments, ILogger Logger)
+   at UnrealBuildTool.UnrealBuildTool.Main(String[] ArgumentsArray)
+WriteFileIfChanged() wrote 0 changed files of 1 requested writes.
 
-Get-Content "$env:LOCALAPPDATA\UnrealBuildTool\Log.txt" -Tail 60
+Timeline:
+[  0.000]  +0.320 Main
+   0.070          [  0.069]  +0.085 Apply XmlConfig
+   0.205          [  0.204]  +0.115 RegisterPlatforms
+[  0.320]  +2.581 BuildMode
+   0.349          [  0.028]  +1.646 Creating MakeFile for mechanic_testingEditor
+   2.000          [  1.679]  +0.036 Preparing ActionGraph
+   2.039          [  1.719]  +0.853 Executing ActionGraph
+   2.893          [  2.572]  +0.008 Saving caches
+[  2.918]  +0.000 TelemetryService.FlushEvents
+[  2.919]
+
+Result: Failed (OtherCompilationError)
+Total execution time: 2.92 seconds
