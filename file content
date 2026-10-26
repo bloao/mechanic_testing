@@ -2,6 +2,5 @@
 <Configuration xmlns="https://www.unrealengine.com/BuildConfiguration">
     <BuildConfiguration>
         <bAllowUBAExecutor>false</bAllowUBAExecutor>
-        <bAllowUBALocalExecutor>false</bAllowUBALocalExecutor>
     </BuildConfiguration>
 </Configuration>
