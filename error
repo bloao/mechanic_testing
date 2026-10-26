@@ -1,2 +1,4 @@
-notepad "C:\Users\hsramin3\mechanic_testing\Source\mechanic_testing.Target.cs"
-notepad "C:\Users\hsramin3\mechanic_testing\Source\mechanic_testingEditor.Target.cs"
+& "C:\Program Files\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat" mechanic_testingEditor Win64 Development "-Project=C:\Users\hsramin3\mechanic_testing\mechanic_testing.uproject" -WaitMutex -NoEngineChanges -NoHotReloadFromIDE
+
+
+Get-Content "$env:LOCALAPPDATA\UnrealBuildTool\Log.txt" -Tail 60
