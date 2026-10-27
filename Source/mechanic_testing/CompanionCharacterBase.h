@@ -21,7 +21,7 @@ public:
 	virtual void UnPossessed() override;
 
 	UFUNCTION(BlueprintCallable, Category = "Abilities")
-	void ConfigureAgileAbilities(bool bIsAgile, int32 AgileJumpCount = 2);
+	virtual void ConfigureAgileAbilities(bool bIsAgile, int32 AgileJumpCount = 2);
 
 	UFUNCTION(BlueprintCallable, Category = "Abilities|Smash")
 	bool PerformSmash();

@@ -24,6 +24,9 @@ public:
 	void InitializeCompanions();
 
 	UFUNCTION(BlueprintCallable, Category = "Companion")
+	void SetCompanionPair(ACharacter* AgilePawn, ACharacter* StrongPawn);
+
+	UFUNCTION(BlueprintCallable, Category = "Companion")
 	void SwitchControlledCharacter();
 
 	UFUNCTION(BlueprintPure, Category = "Companion")

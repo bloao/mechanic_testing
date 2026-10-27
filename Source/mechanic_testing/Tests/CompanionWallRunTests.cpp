@@ -2,12 +2,17 @@
 
 #include "mechanic_testing/CompanionCharacterBase.h"
 #include "mechanic_testing/CompanionCharacterMovementComponent.h"
+#include "mechanic_testing/CompanionGameMode.h"
+#include "mechanic_testing/CompanionSwitchPlayerController.h"
+#include "mechanic_testing/BreakableActor.h"
 #include "AIController.h"
 #include "CollisionQueryParams.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "Misc/AutomationTest.h"
 
@@ -198,6 +203,93 @@ bool FCompanionWallRunDurationTest::RunTest(const FString& Parameters)
 	TestWorld.Movement->Velocity = FVector(600.0, 0.0, 0.0);
 	TestWorld.Step();
 	TestTrue(TEXT("Landing allows a new wall run"), TestWorld.Movement->IsWallRunning());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionPairSetupTest,
+	"MechanicTesting.Companions.PairAndSwitching", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionPairSetupTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	FTestWorld TestWorld(0.0f);
+	TestWorld.Character->SetActorLocation(FVector(0.0, 0.0, 90.0));
+	TestWorld.Player->UnPossess();
+	AddExpectedMessage(TEXT("Companion setup needs two characters."), ELogVerbosity::Warning);
+	ACompanionSwitchPlayerController* CompanionController = TestWorld.World->SpawnActor<ACompanionSwitchPlayerController>();
+	CompanionController->Possess(TestWorld.Character);
+	CompanionController->InitializeCompanions();
+	ACompanionGameMode* Mode = TestWorld.World->SpawnActor<ACompanionGameMode>();
+	// Test spawning/roles without requiring the mannequin or animation assets.
+	Mode->StrongCompanionClass = ACompanionCharacterBase::StaticClass();
+	if (!TestTrue(TEXT("GameMode creates the missing companion"), Mode->SetupCompanionPair(CompanionController))) return false;
+	ACompanionCharacterBase* StrongPawn = Mode->StrongCompanion;
+	TestEqual(TEXT("Agile starts controlled"), CompanionController->GetControlledCompanion(), static_cast<ACharacter*>(TestWorld.Character));
+	TestEqual(TEXT("Agile has two jumps"), TestWorld.Character->JumpMaxCount, 2);
+	TestEqual(TEXT("Strong has one jump"), StrongPawn->JumpMaxCount, 1);
+	TestTrue(TEXT("Only strong can smash"), StrongPawn->CanPerformSmash());
+	TestFalse(TEXT("Agile cannot smash"), TestWorld.Character->CanPerformSmash());
+	TestTrue(TEXT("Agile wall running enabled"), TestWorld.Movement->bCanWallRun);
+	TestFalse(TEXT("Strong wall running disabled"), CastChecked<UCompanionCharacterMovementComponent>(StrongPawn->GetCharacterMovement())->bCanWallRun);
+	for (int32 SwitchIndex = 0; SwitchIndex < 20; ++SwitchIndex)
+	{
+		CompanionController->SwitchControlledCharacter();
+		TestEqual(TEXT("Repeated switching selects the other pawn"), CompanionController->GetControlledCompanion(),
+			static_cast<ACharacter*>(SwitchIndex % 2 == 0 ? StrongPawn : TestWorld.Character));
+		TestNotNull(TEXT("Inactive companion has AI"), Cast<AAIController>(CompanionController->GetFollowerCompanion()->GetController()));
+		int32 AIControllerCount = 0;
+		for (TActorIterator<AAIController> It(TestWorld.World); It; ++It) ++AIControllerCount;
+		TestEqual(TEXT("Switching does not accumulate unused AI controllers"), AIControllerCount, 1);
+	}
+	TestTrue(TEXT("Setup can run repeatedly"), Mode->SetupCompanionPair(CompanionController));
+	TestEqual(TEXT("Existing strong companion is reused"), Mode->StrongCompanion.Get(), StrongPawn);
+	int32 CharacterCount = 0;
+	for (TActorIterator<ACharacter> It(TestWorld.World); It; ++It) ++CharacterCount;
+	TestEqual(TEXT("Exactly two characters, no duplicate spawns"), CharacterCount, 2);
+	AddExpectedMessage(TEXT("Companion setup requires two different valid characters."), ELogVerbosity::Warning);
+	CompanionController->SetCompanionPair(TestWorld.Character, TestWorld.Character);
+	TestEqual(TEXT("Invalid pair does not replace the working pair"), CompanionController->GetFollowerCompanion(), static_cast<ACharacter*>(StrongPawn));
+
+	// Keep the smash sweep clear of the floor in this smaller base-character fixture.
+	StrongPawn->SetActorLocation(StrongPawn->GetActorLocation() + FVector::UpVector * 20.0);
+	ABreakableActor* Breakable = TestWorld.World->SpawnActor<ABreakableActor>(StrongPawn->GetActorLocation() + FVector(100.0, 0.0, 0.0), FRotator::ZeroRotator);
+	UStaticMeshComponent* BreakableMesh = Breakable->FindComponentByClass<UStaticMeshComponent>();
+	// A primitive collider avoids waiting for asynchronous static-mesh compilation.
+	UBoxComponent* HitBox = NewObject<UBoxComponent>(Breakable);
+	HitBox->SetupAttachment(Breakable->GetRootComponent());
+	HitBox->InitBoxExtent(FVector(50.0));
+	HitBox->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	HitBox->SetCollisionObjectType(ECC_WorldDynamic);
+	HitBox->SetCollisionResponseToAllChannels(ECR_Block);
+	HitBox->RegisterComponent();
+	TestTrue(TEXT("Test breakable has physics collision"), HitBox->IsPhysicsStateCreated());
+	TestFalse(TEXT("Agile cannot trigger a smash"), TestWorld.Character->PerformSmash());
+	TestFalse(TEXT("Agile leaves the breakable intact"), Breakable->IsBroken());
+	TestTrue(TEXT("Strong smashes a nearby breakable"), StrongPawn->PerformSmash());
+	TestTrue(TEXT("Breakable applies its broken state"), Breakable->IsBroken());
+	TestFalse(TEXT("Broken mesh is hidden"), BreakableMesh->IsVisible());
+	TestEqual(TEXT("Broken mesh collision is disabled"), BreakableMesh->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionPairNoFloorTest,
+	"MechanicTesting.Companions.NoFloor", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionPairNoFloorTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	FTestWorld TestWorld(0.0f);
+	TestWorld.Character->SetActorLocation(FVector(10000.0, 0.0, 90.0));
+	TestWorld.Player->UnPossess();
+	AddExpectedMessage(TEXT("Companion setup needs two characters."), ELogVerbosity::Warning);
+	ACompanionSwitchPlayerController* CompanionController = TestWorld.World->SpawnActor<ACompanionSwitchPlayerController>();
+	CompanionController->Possess(TestWorld.Character);
+	CompanionController->InitializeCompanions();
+	ACompanionGameMode* Mode = TestWorld.World->SpawnActor<ACompanionGameMode>();
+	Mode->StrongCompanionClass = ACompanionCharacterBase::StaticClass();
+	AddExpectedMessage(TEXT("Could not spawn Strong:"), ELogVerbosity::Warning);
+	TestFalse(TEXT("No floor causes a safe spawn failure"), Mode->SetupCompanionPair(CompanionController));
+	TestNull(TEXT("No companion spawned over empty space"), Mode->StrongCompanion.Get());
 	return true;
 }
 

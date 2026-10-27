@@ -11,6 +11,8 @@ the agile abilities in Play, or supply the controller's explicit companion pair.
 `main` is the UE 5.6 integration with the teammate's original blockout assets
 preserved. Start with `UE56_SETUP.md` on the university PC. The Mac build script
 below belongs to the separate 5.3 prototype; it cannot build this 5.6 checkout.
+For the new automatically spawned pair, use `TWO_CHARACTERS_SETUP.md` instead of
+the manual Blueprint placement/reparenting workflow below.
 
 1. Close Unreal Editor. Rebuild the `mechanic_testingEditor` target for your engine
    version. Restart the editor after the build; Live Coding alone is insufficient

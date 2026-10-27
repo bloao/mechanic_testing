@@ -65,6 +65,19 @@ void ACompanionSwitchPlayerController::Tick(float DeltaSeconds)
 	}
 }
 
+void ACompanionSwitchPlayerController::SetCompanionPair(ACharacter* AgilePawn, ACharacter* StrongPawn)
+{
+	if (!IsValid(AgilePawn) || !IsValid(StrongPawn) || AgilePawn == StrongPawn)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Companion setup requires two different valid characters."));
+		return;
+	}
+	CompanionCharacters = {AgilePawn, StrongPawn};
+	AgileCompanionIndex = 0;
+	bAutoDiscoverCharacters = false;
+	InitializeCompanions();
+}
+
 void ACompanionSwitchPlayerController::InitializeCompanions()
 {
 	EnsureTwoCompanions();
@@ -201,6 +214,13 @@ void ACompanionSwitchPlayerController::PossessCompanionAtIndex(int32 NewIndex)
 	}
 
 	ControlledCompanionIndex = NewIndex;
+	// The incoming follower must stop its AI path before taking player input.
+	if (AAIController* IncomingAI = Cast<AAIController>(NewControlledCharacter->GetController()))
+	{
+		IncomingAI->StopMovement();
+		IncomingAI->UnPossess();
+		IncomingAI->Destroy();
+	}
 	Possess(NewControlledCharacter);
 
 	UpdateFollowerMove();

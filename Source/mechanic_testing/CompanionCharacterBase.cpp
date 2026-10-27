@@ -32,6 +32,7 @@ void ACompanionCharacterBase::OnConstruction(const FTransform& Transform)
 void ACompanionCharacterBase::ConfigureAgileAbilities(bool bIsAgile, int32 AgileJumpCount)
 {
 	bCanDoubleJump = bIsAgile;
+	bCanSmash = !bIsAgile;
 	MaxJumpCount = FMath::Max(AgileJumpCount, 2);
 	ApplyJumpSettings();
 	if (UCompanionCharacterMovementComponent* Movement = Cast<UCompanionCharacterMovementComponent>(GetCharacterMovement()))
@@ -84,7 +85,7 @@ void ACompanionCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerI
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	if (bCanSmash && SmashInputAction)
+	if (SmashInputAction)
 	{
 		if (UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 		{
