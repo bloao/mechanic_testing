@@ -15,6 +15,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "Misc/AutomationTest.h"
+#include "Misc/EngineVersionComparison.h"
 
 namespace CompanionWallRunTests
 {
@@ -290,6 +291,33 @@ bool FCompanionPairNoFloorTest::RunTest(const FString& Parameters)
 	AddExpectedMessage(TEXT("Could not spawn Strong:"), ELogVerbosity::Warning);
 	TestFalse(TEXT("No floor causes a safe spawn failure"), Mode->SetupCompanionPair(CompanionController));
 	TestNull(TEXT("No companion spawned over empty space"), Mode->StrongCompanion.Get());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionFollowerMovementTest,
+	"MechanicTesting.Companions.FollowerMovement", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionFollowerMovementTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	for (bool bAgile : {true, false})
+	{
+		FTestWorld TestWorld(0.0f);
+		TestWorld.Character->ConfigureAgileAbilities(bAgile);
+		TestWorld.World->SpawnActor<AAIController>()->Possess(TestWorld.Character);
+		TestWorld.Character->SetActorLocation(FVector(0.0, 0.0, 90.0));
+		TestWorld.Movement->SetMovementMode(MOVE_Walking);
+		TestWorld.Movement->Velocity = FVector::ZeroVector;
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
+		TestTrue(TEXT("AI path following uses acceleration"), TestWorld.Movement->UseAccelerationForPathFollowing());
+#else
+		TestTrue(TEXT("AI path following uses acceleration"), TestWorld.Movement->GetNavMovementProperties()->bUseAccelerationForPaths);
+#endif
+		TestWorld.Movement->RequestPathMove(FVector::ForwardVector);
+		TestWorld.Step(false);
+		TestFalse(TEXT("AI movement supplies acceleration for the animation"), TestWorld.Movement->GetCurrentAcceleration().IsNearlyZero());
+		TestTrue(TEXT("AI movement produces forward velocity"), TestWorld.Movement->Velocity.X > 0.0);
+	}
 	return true;
 }
 

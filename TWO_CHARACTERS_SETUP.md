@@ -42,6 +42,13 @@ WorldStatic or WorldDynamic. Place it within Strong's forward smash range (defau
 180 cm, sweep radius 90 cm). Press E facing it. Hits Required, hide/collision response,
 and optional destruction remain Blueprint editable. No smash animation is supplied.
 
+## Follower Walking Animation
+
+The shared movement component enables acceleration-based AI path following. This
+supplies the acceleration used by the template locomotion animation, instead of
+moving the follower by direct velocity while its animation remains idle. Rebuild
+after updating this C++ code, and test both followers after switching.
+
 ## Settings and Limitations
 
 Make a Blueprint child of `CompanionGameMode` to adjust Strong Companion Class or
@@ -74,8 +81,9 @@ Tab switches, NavMesh following, and Stop/Play spawning only one pair each time.
 ## Verification
 
 The native code passed UnrealHeaderTool and a Development Editor build in an
-isolated UE 5.3 compatibility project. All five `MechanicTesting` automation tests
-passed: three wall-run regressions plus pair/switching/smash and no-floor spawning.
+isolated UE 5.3 compatibility project. All six `MechanicTesting` automation tests
+passed: three wall-run regressions plus pair/switching/smash, no-floor spawning,
+and follower acceleration for both roles.
 The pair test checks 20 switches, exactly one follower AI controller, role-specific
 abilities, reuse without duplicate characters, and breakable hide/collision state.
 It uses primitive collision to avoid asynchronous asset compilation in a headless run.
@@ -83,5 +91,7 @@ It uses primitive collision to avoid asynchronous asset compilation in a headles
 Only the verification copy used 5.3 target settings and the legacy input mapping
 path. This checkout retains its 5.6 targets and input paths. The actual Windows 5.6
 build, native camera/input lifecycle, mannequin animation Blueprints, map override,
-and NavMesh following still require the Editor checks above. No 5.6 assets were
+and NavMesh following still require the Editor checks above. The headless test
+verifies acceleration, not the actual
+animation Blueprint or the map's navigation route. No 5.6 assets were
 opened or resaved with 5.3.

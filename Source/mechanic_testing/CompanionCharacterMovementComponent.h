@@ -10,6 +10,8 @@ class MECHANIC_TESTING_API UCompanionCharacterMovementComponent : public UCharac
 	GENERATED_BODY()
 
 public:
+	UCompanionCharacterMovementComponent();
+
 	UFUNCTION(BlueprintCallable, Category = "Abilities|Wall Run")
 	void SetWallRunEnabled(bool bEnabled);
 

@@ -9,7 +9,18 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
+#include "Misc/EngineVersionComparison.h"
 #include "Templates/UnrealTemplate.h"
+
+UCompanionCharacterMovementComponent::UCompanionCharacterMovementComponent()
+{
+	// The template locomotion animation checks acceleration as well as velocity.
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
+	bUseAccelerationForPaths = true;
+#else
+	NavMovementProperties.bUseAccelerationForPaths = true;
+#endif
+}
 
 static TAutoConsoleVariable<int32> CVarCompanionWallRunDebug(
 	TEXT("companion.WallRun.Debug"), 0,
