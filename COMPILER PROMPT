@@ -1,0 +1,2 @@
+$ProjectFile = Join-Path (Get-Location).Path "mechanic_testing.uproject"
+& "C:\Program Files\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat" mechanic_testingEditor Win64 Development "-Project=$ProjectFile" -WaitMutex -NoEngineChanges -NoHotReloadFromIDE
