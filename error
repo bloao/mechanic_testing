@@ -1,2 +1,37 @@
-$ProjectFile = Join-Path (Get-Location).Path "mechanic_testing.uproject"
-& "C:\Program Files\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat" mechanic_testingEditor Win64 Development "-Project=$ProjectFile" -WaitMutex -NoEngineChanges -NoHotReloadFromIDE
+PS C:\Users\hsramin3\mechanic_testing-combined> & "C:\Program Files\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat" mechanic_testingEditor Win64 Development "-Project=$ProjectFile" -WaitMutex -NoEngineChanges -NoHotReloadFromIDE
+Using bundled DotNet SDK version: 8.0.300 win-x64
+Running UnrealBuildTool: dotnet "..\..\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.dll" mechanic_testingEditor Win64 Development -Project=C:\Users\hsramin3\mechanic_testing-combined\mechanic_testing.uproject -WaitMutex -NoEngineChanges -NoHotReloadFromIDE
+Log file: C:\Users\hsramin3\AppData\Local\UnrealBuildTool\Log.txt
+Using 'git status' to determine working set for adaptive non-unity build (C:\Users\hsramin3\mechanic_testing-combined).
+Invalidating makefile for mechanic_testingEditor (source file added)
+Available x64 toolchains (1):
+ * C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231
+    (Family=14.51.36231, FamilyRank=1, Version=14.51.36260, HostArchitecture=x64, ReleaseChannel=Latest, Architecture=x64)
+Visual Studio 2022 compiler version 14.51.36260 is not a preferred version. Please use the latest preferred version 14.38.33130
+Parsing headers for mechanic_testingEditor
+  Running Internal UnrealHeaderTool C:\Users\hsramin3\mechanic_testing-combined\mechanic_testing.uproject C:\Users\hsramin3\mechanic_testing-combined\Intermediate\Build\Win64\mechanic_testingEditor\Development\mechanic_testingEditor.uhtmanifest -WarningsAsErrors -installed
+Total of 8 written
+Reflection code generated for mechanic_testingEditor in 1.7345331 seconds
+Building mechanic_testingEditor...
+Using Visual Studio 2022 14.51.36260 toolchain (C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231) and Windows 10.0.26100.0 SDK (C:\Program Files (x86)\Windows Kits\10).
+Warning: Visual Studio 2022 compiler is not a preferred version
+Determining max actions to execute in parallel (12 physical cores, 20 logical cores)
+  Executing up to 12 processes, one per physical core
+  Requested 1.5 GB memory per action, 5.8 GB available: limiting max parallel actions to 3
+Using Parallel executor to run 9 action(s)
+------ Building 9 action(s) started ------
+[1/9] Compile [x64] CompanionGameMode.cpp
+[2/9] Compile [x64] CompanionCharacterBase.cpp
+[3/9] Compile [x64] CompanionWallRunTests.cpp
+[4/9] Compile [x64] CompanionSwitchPlayerController.cpp
+[5/9] Compile [x64] CompanionPlayableCharacter.cpp
+[6/9] Compile [x64] Module.mechanic_testing.gen.cpp
+[7/9] Link [x64] UnrealEditor-mechanic_testing.lib
+   Creating library C:/Users/hsramin3/mechanic_testing-combined/Intermediate/Build/Win64/x64/UnrealEditor/Development/mechanic_testing/UnrealEditor-mechanic_testing.lib and object C:/Users/hsramin3/mechanic_testing-combined/Intermediate/Build/Win64/x64/UnrealEditor/Development/mechanic_testing/UnrealEditor-mechanic_testing.exp
+[8/9] Link [x64] UnrealEditor-mechanic_testing.dll
+[9/9] WriteMetadata mechanic_testingEditor.target
+Total time in Parallel executor: 11.00 seconds
+
+Result: Succeeded
+Total execution time: 15.52 seconds
+PS C:\Users\hsramin3\mechanic_testing-combined>
