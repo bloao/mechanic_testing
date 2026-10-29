@@ -74,6 +74,10 @@ double jumps, landing on platforms, jumping over gaps, switching while airborne,
 and Stop/Play. Following still requires valid NavMesh routes; this change does not
 add AI jumping, climbing, or any new navigation links.
 
+For manually placed two-way jump routes, see [Smart Jump Link Setup](SMART_JUMP_LINK_SETUP.md).
+The optional `CompanionJumpNavLink` actor provides bounded normal jumps and landing
+handoff; existing links and map assets are not replaced automatically.
+
 ## Settings and Limitations
 
 Make a Blueprint child of `CompanionGameMode` to adjust Strong Companion Class or
@@ -106,9 +110,10 @@ Tab switches, NavMesh following, and Stop/Play spawning only one pair each time.
 ## Verification
 
 The native code passed UnrealHeaderTool and a Development Editor build in an
-isolated UE 5.3 compatibility project. All seven `MechanicTesting` automation tests
+isolated UE 5.3 compatibility project. All nine `MechanicTesting` automation tests
 passed: three wall-run regressions plus pair/switching/smash, no-floor spawning,
-follower acceleration for both roles, and airborne ground-target following.
+follower acceleration for both roles, airborne ground-target following, and smart
+jump-link planning/traversal.
 The pair test checks 20 switches, exactly one follower AI controller, role-specific
 abilities, reuse without duplicate characters, and breakable hide/collision state.
 It uses primitive collision to avoid asynchronous asset compilation in a headless run.
@@ -117,6 +122,9 @@ airborne, bounded search depth, last-target retention, switching, cleanup, and
 preserving active/paused requests while still stopping at the ground target.
 It seeds a cached target and synthetic path because the fixture has no baked
 NavMesh. Actual NavMesh projection and path replanning need the PC Play test above.
+Jump-link tests cover physical jumps in both directions, normal jump limits,
+blocked/unreachable routes, landing handoff, possession changes, timeout, cleanup,
+and preserving a paused traversal even when near the follow target.
 
 Only the verification copy used 5.3 target settings and the legacy input mapping
 path. This checkout retains its 5.6 targets and input paths. The actual Windows 5.6

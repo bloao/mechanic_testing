@@ -3,6 +3,7 @@
 #include "mechanic_testing/CompanionCharacterBase.h"
 #include "mechanic_testing/CompanionCharacterMovementComponent.h"
 #include "mechanic_testing/CompanionGameMode.h"
+#include "mechanic_testing/CompanionJumpNavLink.h"
 #include "mechanic_testing/CompanionSwitchPlayerController.h"
 #include "mechanic_testing/BreakableActor.h"
 #include "AIController.h"
@@ -19,6 +20,7 @@
 #include "Misc/EngineVersionComparison.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "NavigationData.h"
+#include "NavLinkCustomComponent.h"
 
 namespace CompanionWallRunTests
 {
@@ -373,10 +375,10 @@ bool FCompanionAirborneFollowTest::RunTest(const FString& Parameters)
 	CompanionController->Tick(0.3f);
 	TestTrue(TEXT("No ground hit retains the last valid target"), Target->GetActorLocation().Equals(FVector(400.0, 0.0, 300.0)));
 	PathFollowing->PauseMove(MoveId);
-	CompanionController->Tick(0.3f);
-	TestTrue(TEXT("Follow refresh preserves paused traversal"), FollowerAI->GetMoveStatus() == EPathFollowingStatus::Paused);
-	PathFollowing->ResumeMove(MoveId);
 	Follower->SetActorLocation(Target->GetActorLocation() + FVector(0.0, 100.0, Follower->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()));
+	CompanionController->Tick(0.3f);
+	TestTrue(TEXT("Follow refresh preserves paused traversal even near the target"), FollowerAI->GetMoveStatus() == EPathFollowingStatus::Paused);
+	PathFollowing->ResumeMove(MoveId);
 	CompanionController->Tick(0.3f);
 	TestTrue(TEXT("Stopping distance uses the ground target, not the airborne leader"), FollowerAI->GetMoveStatus() == EPathFollowingStatus::Idle);
 	CompanionController->SwitchControlledCharacter();
@@ -385,6 +387,121 @@ bool FCompanionAirborneFollowTest::RunTest(const FString& Parameters)
 	CompanionController->EndPlay(EEndPlayReason::Destroyed);
 	CompanionController->Destroy();
 	TestTrue(TEXT("The transient follow target is cleaned up with the controller"), Target->IsActorBeingDestroyed());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionJumpPlanTest,
+	"MechanicTesting.Companions.JumpLinkPlanning", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionJumpPlanTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	FTestWorld TestWorld(0.0f);
+	TestWorld.Movement->SetMovementMode(MOVE_Walking);
+	TestWorld.Movement->JumpZVelocity = 700.0f;
+	TestWorld.Movement->MaxWalkSpeed = 500.0f;
+	TestWorld.Character->SetActorLocation(FVector(0.0, 0.0, 90.0));
+	TestWorld.AddBox(FVector(500.0, 0.0, 50.0), FVector(200.0, 300.0, 50.0));
+	ACompanionJumpNavLink* Link = TestWorld.World->SpawnActor<ACompanionJumpNavLink>();
+	TestTrue(TEXT("Native link is smart and relevant"), Link->bSmartLinkIsRelevant);
+	TestEqual(TEXT("No simple link can bypass jump execution"), Link->PointLinks.Num(), 0);
+	FVector Start;
+	FVector End;
+	ENavLinkDirection::Type Direction;
+	Link->GetSmartLinkComp()->GetLinkData(Start, End, Direction);
+	TestTrue(TEXT("Native start widget configures the smart link"), Start.Equals(Link->StartPoint));
+	TestTrue(TEXT("Native end widget configures the smart link"), End.Equals(Link->EndPoint));
+	TestTrue(TEXT("Both directions are enabled by default"), Direction == ENavLinkDirection::BothWays);
+	FVector Velocity;
+	FVector Landing;
+	FString Reason;
+	for (bool bAgile : {true, false})
+	{
+		TestWorld.Character->ConfigureAgileAbilities(bAgile);
+		TestTrue(TEXT("A reachable upward jump is planned for either role"), Link->BuildJumpPlan(TestWorld.Character, FVector(500.0, 0.0, 100.0), Velocity, Landing, Reason));
+		TestTrue(TEXT("The normal vertical jump speed is respected"), FMath::IsNearlyEqual(Velocity.Z, 700.0));
+		TestTrue(TEXT("The normal horizontal speed limit is respected"), Velocity.Size2D() <= 500.0);
+	}
+	TestWorld.Character->SetActorLocation(FVector(500.0, 0.0, 190.0));
+	TestTrue(TEXT("The same link can plan the return jump down"), Link->BuildJumpPlan(TestWorld.Character, FVector::ZeroVector, Velocity, Landing, Reason));
+	TestWorld.Character->SetActorLocation(FVector(0.0, 0.0, 90.0));
+	TestWorld.AddBox(FVector(1000.0, 0.0, 350.0), FVector(150.0, 300.0, 50.0));
+	TestFalse(TEXT("An unreachable height is rejected"), Link->BuildJumpPlan(TestWorld.Character, FVector(1000.0, 0.0, 400.0), Velocity, Landing, Reason));
+	TestFalse(TEXT("An unreachable horizontal distance is rejected"), Link->BuildJumpPlan(TestWorld.Character, FVector(4000.0, 0.0, 0.0), Velocity, Landing, Reason));
+	TestFalse(TEXT("Missing landing ground is rejected"), Link->BuildJumpPlan(TestWorld.Character, FVector(10000.0, 0.0, 0.0), Velocity, Landing, Reason));
+	TestWorld.AddBox(FVector(250.0, 0.0, 250.0), FVector(20.0, 300.0, 250.0));
+	TestFalse(TEXT("A wall blocking the full capsule arc is rejected"), Link->BuildJumpPlan(TestWorld.Character, FVector(500.0, 0.0, 100.0), Velocity, Landing, Reason));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionJumpTraversalTest,
+	"MechanicTesting.Companions.JumpLinkTraversal", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionJumpTraversalTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	FTestWorld TestWorld(0.0f);
+	TestWorld.AddBox(FVector(500.0, 0.0, 50.0), FVector(200.0, 300.0, 50.0));
+	TestWorld.Player->UnPossess();
+	AAIController* AI = TestWorld.World->SpawnActor<AAIController>();
+	AI->Possess(TestWorld.Character);
+	TestWorld.Movement->JumpZVelocity = 700.0f;
+	TestWorld.Movement->MaxWalkSpeed = 500.0f;
+	TestWorld.Movement->AirControl = 0.35f;
+	ACompanionJumpNavLink* Link = TestWorld.World->SpawnActor<ACompanionJumpNavLink>();
+	Link->DispatchBeginPlay();
+	const auto StartJump = [&](bool bReturn = false)
+	{
+		const FVector Destination = bReturn ? FVector::ZeroVector : FVector(500.0, 0.0, 100.0);
+		TestWorld.Character->SetActorLocation(bReturn ? FVector(500.0, 0.0, 190.0) : FVector(0.0, 0.0, 90.0));
+		TestWorld.Movement->SetMovementMode(MOVE_Walking);
+		TestWorld.Movement->Velocity = FVector::ZeroVector;
+		if (AI->GetPawn() != TestWorld.Character) AI->Possess(TestWorld.Character);
+		FAIMoveRequest Request(Destination);
+		Request.SetAcceptanceRadius(50.0f);
+		AI->RequestMove(Request, MakeShared<FNavigationPath, ESPMode::ThreadSafe>(
+			TArray<FVector>{TestWorld.Movement->GetActorFeetLocation(), Destination}));
+		// Exercise the actual component-to-proxy callback without a baked NavMesh.
+		Link->GetSmartLinkComp()->OnLinkMoveStarted(AI->GetPathFollowingComponent(), Destination);
+	};
+	StartJump();
+	TestTrue(TEXT("Smart-link callback starts traversal"), Link->Traversals.Contains(TestWorld.Character));
+	TestTrue(TEXT("Path following is paused during the jump"), AI->GetMoveStatus() == EPathFollowingStatus::Paused);
+	for (int32 Step = 0; Step < 240 && !Link->Traversals.IsEmpty(); ++Step)
+	{
+		TestWorld.Step(false);
+		Link->Tick(1.0f / 60.0f);
+	}
+	TestTrue(TEXT("Landing completes traversal"), Link->Traversals.IsEmpty());
+	TestTrue(TEXT("Character reaches the upper landing"), FVector::Dist(TestWorld.Movement->GetActorFeetLocation(), FVector(500.0, 0.0, 100.0)) <= Link->LandingTolerance);
+	TestTrue(TEXT("Normal air control is restored after landing"), FMath::IsNearlyEqual(TestWorld.Movement->AirControl, 0.35f));
+	TestTrue(TEXT("Path following is no longer paused"), AI->GetMoveStatus() != EPathFollowingStatus::Paused);
+	StartJump(true);
+	for (int32 Step = 0; Step < 240 && !Link->Traversals.IsEmpty(); ++Step)
+	{
+		TestWorld.Step(false);
+		Link->Tick(1.0f / 60.0f);
+	}
+	TestTrue(TEXT("Return jump down completes traversal"), Link->Traversals.IsEmpty());
+	TestTrue(TEXT("Return jump reaches the lower landing"), TestWorld.Movement->GetActorFeetLocation().Size() <= Link->LandingTolerance);
+	StartJump();
+	AI->UnPossess();
+	TestWorld.Player->Possess(TestWorld.Character);
+	Link->Tick(1.0f / 60.0f);
+	TestTrue(TEXT("Changing possession cancels link ownership"), Link->Traversals.IsEmpty());
+	TestTrue(TEXT("Player regains normal air control"), FMath::IsNearlyEqual(TestWorld.Movement->AirControl, 0.35f));
+	TestEqual(TEXT("Player possession is not disturbed"), TestWorld.Character->GetController(), static_cast<AController*>(TestWorld.Player));
+	TestWorld.Player->UnPossess();
+	StartJump();
+	AddExpectedMessage(TEXT("the traversal timed out"), ELogVerbosity::Warning);
+	Link->Tick(Link->TraversalTimeout + 1.0f);
+	TestTrue(TEXT("Timeout clears traversal"), Link->Traversals.IsEmpty());
+	TestTrue(TEXT("Timeout aborts the AI move"), AI->GetMoveStatus() == EPathFollowingStatus::Idle);
+	TestTrue(TEXT("Timeout restores movement settings"), FMath::IsNearlyEqual(TestWorld.Movement->AirControl, 0.35f));
+	StartJump();
+	Link->EndPlay(EEndPlayReason::Destroyed);
+	TestTrue(TEXT("Removing the link clears traversal"), Link->Traversals.IsEmpty());
+	TestTrue(TEXT("Removing the link restores movement settings"), FMath::IsNearlyEqual(TestWorld.Movement->AirControl, 0.35f));
 	return true;
 }
 

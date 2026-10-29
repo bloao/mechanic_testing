@@ -258,6 +258,14 @@ void ACompanionSwitchPlayerController::UpdateFollowerMove()
 	{
 		return;
 	}
+	// Keep the current goal and movement owned by the smart link until landing.
+	if (UPathFollowingComponent* Path = FollowerController->GetPathFollowingComponent())
+	{
+		if (Path->GetStatus() == EPathFollowingStatus::Paused || Path->GetCurrentCustomLinkOb())
+		{
+			return;
+		}
+	}
 
 	if (GroundTargetLeader.Get() != Leader)
 	{
