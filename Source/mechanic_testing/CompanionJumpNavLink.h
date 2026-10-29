@@ -65,4 +65,3 @@ private:
 	void FinishTraversal(TWeakObjectPtr<ACharacter> CompanionPawn, bool bSuccess);
 	void WarnRejected(const FString& Reason);
 };
-

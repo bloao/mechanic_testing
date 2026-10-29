@@ -254,4 +254,3 @@ void ACompanionJumpNavLink::WarnRejected(const FString& Reason)
 		LastWarningTime = GetWorld()->GetTimeSeconds();
 	}
 }
-
