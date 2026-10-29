@@ -1,5 +1,6 @@
-git add Content Config
-git diff --cached --stat
-git commit -m "Update blockout navigation and level setup"
+git branch --show-current
+git status
+git add Content
+git commit -m "Add wall-run animations and Agile animation blueprint"
 git pull --no-rebase origin main
 git push origin main
