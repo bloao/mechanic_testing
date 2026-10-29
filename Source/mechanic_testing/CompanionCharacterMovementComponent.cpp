@@ -28,7 +28,7 @@ static TAutoConsoleVariable<int32> CVarCompanionWallRunDebug(
 
 FString UCompanionCharacterMovementComponent::GetWallRunDebugStatus() const
 {
-	if (bWallRunning) return TEXT("RUNNING (no dedicated animation yet)");
+	if (bWallRunning) return TEXT("RUNNING");
 	if (!bCanWallRun) return TEXT("Disabled: this character has not been given wall running");
 	if (!IsFalling()) return TEXT("Grounded: jump while moving alongside the wall");
 	if (bWallRunUsedThisAirborne) return TEXT("Already used: land before trying again");
@@ -100,6 +100,12 @@ void UCompanionCharacterMovementComponent::SetWallRunEnabled(bool bEnabled)
 void UCompanionCharacterMovementComponent::StopWallRun()
 {
 	bWallRunning = false;
+}
+
+bool UCompanionCharacterMovementComponent::IsWallOnRight() const
+{
+	const FVector TravelRight = FVector::CrossProduct(FVector::UpVector, WallRunDirection);
+	return bWallRunning && FVector::DotProduct(TravelRight, -WallNormal) > 0.0f;
 }
 
 bool UCompanionCharacterMovementComponent::JumpOffWall()

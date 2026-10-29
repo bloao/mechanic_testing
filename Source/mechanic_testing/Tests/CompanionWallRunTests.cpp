@@ -149,6 +149,33 @@ bool FCompanionWallRunEligibilityTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionWallRunAnimationStateTest,
+	"MechanicTesting.WallRun.AnimationState", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionWallRunAnimationStateTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	for (float Side : {1.0f, -1.0f})
+	{
+		for (float Travel : {1.0f, -1.0f})
+		{
+			FTestWorld TestWorld(Side);
+			TestFalse(TEXT("Idle movement does not expose a stale wall side"), TestWorld.Movement->IsWallOnRight());
+			// Camera/actor facing must not reverse the animation's travel-relative side.
+			TestWorld.Character->SetActorRotation(FRotator(0.0, 90.0, 0.0));
+			TestWorld.Movement->Velocity = FVector::ForwardVector * (600.0f * Travel);
+			TestWorld.Character->AddMovementInput(FVector::ForwardVector, Travel);
+			TestWorld.Step(false);
+			TestTrue(TEXT("Animation state reports an active wall run"), TestWorld.Movement->IsWallRunning());
+			TestEqual(TEXT("Animation side follows the wall and direction of travel"), TestWorld.Movement->IsWallOnRight(), Side * Travel > 0.0f);
+			TestWorld.Movement->SetWallRunEnabled(false);
+			TestFalse(TEXT("Disabling the ability clears the animation state"), TestWorld.Movement->IsWallRunning());
+			TestFalse(TEXT("Disabling the ability clears the animation side"), TestWorld.Movement->IsWallOnRight());
+		}
+	}
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionWallRunExitTest,
 	"MechanicTesting.WallRun.JumpAndPossession", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
 

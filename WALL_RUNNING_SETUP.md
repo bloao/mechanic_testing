@@ -51,9 +51,56 @@ the manual Blueprint placement/reparenting workflow below.
   reaching the time limit, landing, or switching with Tab ends the run.
 - Only one wall run is allowed per airborne period. Landing restores it.
 
-The first version supports static, nearly vertical walls and standard downward
-gravity. It has no dedicated wall-run animation, camera tilt, or multiplayer
-prediction. The template's existing falling animation remains in use.
+The movement supports static, nearly vertical walls and standard downward gravity.
+There is no camera tilt or multiplayer prediction. Use the animation setup below
+to replace the template falling pose during wall runs; it does not change physics.
+
+## Agile Animation Wiring (UE 5.6)
+
+The native playable character now selects
+`/Game/Characters/Mannequins/Animations/ABP_Agile` for Agile. Strong still selects
+`ABP_Manny`. Existing Blueprint subclasses with an overridden **Agile Animation
+Class** must select `ABP_Agile` or reset that property to the native default.
+Do not change `ABP_Manny`, `ABP_Quinn`, the skeletons, or the existing input graph.
+
+Close the editor, rebuild C++, and reopen before looking for the new function.
+Only the C++ connection is implemented here: the graph wiring must be saved on
+the UE 5.6 PC. A copied, unwired `ABP_Agile` still plays normal locomotion.
+
+1. Open `ABP_Agile`. Create two Boolean variables: `WallRunning` and `WallOnRight`,
+   both default false.
+2. In its **Event Graph**, use **Event Blueprint Update Animation**. Preserve any
+   existing update logic, adding a **Sequence** if needed. Each update, use
+   **Try Get Pawn Owner > Get Movement Component > Cast To
+   CompanionCharacterMovementComponent**. Do not use Get Player Character: the
+   animation must read its own pawn when characters switch or become AI-controlled.
+3. From the successful cast, call **Is Wall Running** and **Is Wall On Right**.
+   Set the two Boolean variables from those results. On an invalid owner or failed
+   cast, set both false. Use this regular Event Graph, not a thread-safe animation
+   update function, for the pawn/component calls.
+4. In **AnimGraph**, drag in these retargeted sequences as Sequence Players:
+   `/Game/Characters/Agile/Animations/Wallrun/Quinn_wall_run_left` and
+   `/Game/Characters/Agile/Animations/Wallrun/Quinn_wall_run_right`.
+   Enable **Loop Animation** on each. Keep **Enable Root Motion** off in both
+   animation assets: the existing C++ movement owns character displacement.
+5. Add **Blend Poses by bool**. Its **Active Value** is `WallOnRight`;
+   **True Pose** is the right Sequence Player; **False Pose** is the left one.
+   Set True/False Blend Time to `0.15` seconds. Name/comment it **Wall Side**.
+6. Find **Output Pose**. Preserve the entire existing graph feeding it (including
+   its normal foot IK). Insert a second **Blend Poses by bool** immediately before
+   Output Pose: original graph output into **False Pose**, Wall Side output into
+   **True Pose**, `WallRunning` into **Active Value**. Connect its result to Output
+   Pose and set both blend times to `0.15` seconds. This keeps foot IK on normal
+   locomotion without letting ground-foot correction distort the wall-run poses.
+7. Compile and save `ABP_Agile` and both animation assets. Test Agile on a left and
+   right wall, then run back in the opposite direction. The side is relative to
+   travel along the wall, not the camera. Test landing, releasing movement,
+   jumping away, and switching with Tab; each must blend out of the wall pose.
+   Strong and the AI follower must retain normal walking/jumping animations.
+
+The functions only expose movement state; they do not start a wall run or add
+traces, inputs, impulses, montages, or mesh rotation. If the pose is reversed,
+first check True/False pose connections and preview the two named animation clips.
 
 ## Verification
 
@@ -61,7 +108,7 @@ For live diagnosis, enter `companion.WallRun.Debug 1` in the editor's console
 command field, then Play. The controlled companion shows the current blocker
 (disabled ability, grounded, low speed, missing wall, or wrong movement direction).
 Side traces turn green for a valid wall and red otherwise. `RUNNING` confirms the
-physics is active even though the character still uses the template falling pose.
+physics is active; the dedicated pose also requires the animation wiring above.
 Enter `companion.WallRun.Debug 0` to disable diagnostics. If no message appears,
 check Output Log for a missing custom movement component or character-parent warning.
 These commands do not change or save the map or Blueprint assets.
@@ -89,5 +136,10 @@ end resumes falling, and repeated Tab switches retain normal movement and follow
 The mechanics originated in the 5.3 prototype. The integration retains the 5.6
 blockout's `/Game/Input/IMC_Default` mapping and updates both targets for 5.6.
 The latest integration has not been compiled or played on Windows 5.6 here.
-The temporary Mac compiler setup is no longer available, so a new Mac build
-could not be run either. Build and run the tests again on the university PC.
+The animation connection is verified in an isolated UE 5.3 compatibility project,
+without opening or resaving the UE 5.6 assets. Native tests also cover the exposed
+animation state on both sides in both travel directions and its reset on exit.
+The compatibility Editor build and all ten `MechanicTesting` automation tests
+passed with zero test warnings or failures after this change.
+Build and run the tests again on the university PC, then check the actual poses
+and blend timing in Play; headless tests do not verify the Blueprint graph.

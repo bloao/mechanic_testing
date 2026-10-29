@@ -18,6 +18,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Abilities|Wall Run")
 	bool IsWallRunning() const { return bWallRunning; }
 
+	/** Wall side relative to travel along the wall, not the camera. False when not wall running. */
+	UFUNCTION(BlueprintPure, Category = "Abilities|Wall Run")
+	bool IsWallOnRight() const;
+
 	void StopWallRun();
 	bool JumpOffWall();
 
