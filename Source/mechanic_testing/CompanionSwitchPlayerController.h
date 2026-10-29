@@ -7,6 +7,7 @@
 
 class AAIController;
 class ACharacter;
+class ATargetPoint;
 class UInputMappingContext;
 
 UCLASS(Blueprintable)
@@ -19,6 +20,7 @@ public:
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UFUNCTION(BlueprintCallable, Category = "Companion")
 	void InitializeCompanions();
@@ -60,6 +62,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Companion|Follow", meta = (ClampMin = "0.05", UIMin = "0.05"))
 	float FollowRefreshInterval;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Companion|Follow", meta = (ClampMin = "100.0", Units = "cm"))
+	float FollowGroundSearchDepth = 2000.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Companion|Abilities", meta = (ClampMin = "0", UIMin = "0", ClampMax = "1", UIMax = "1"))
 	int32 AgileCompanionIndex;
 
@@ -70,6 +75,14 @@ protected:
 	bool bLogCompanionSetup;
 
 private:
+	friend class FCompanionAirborneFollowTest;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ATargetPoint> GroundFollowTarget;
+
+	TWeakObjectPtr<ACharacter> GroundTargetLeader;
+	bool bHasGroundFollowTarget = false;
+
 	int32 ControlledCompanionIndex;
 	float TimeSinceLastFollowUpdate;
 
@@ -77,6 +90,7 @@ private:
 	void ApplyCompanionAbilitySettings();
 	void PossessCompanionAtIndex(int32 NewIndex);
 	void UpdateFollowerMove();
+	bool FindGroundBelowLeader(const ACharacter* Leader, const ACharacter* Follower, FVector& GroundLocation) const;
 	AAIController* EnsureAIController(ACharacter* CompanionPawn) const;
 	ACharacter* GetCompanionAtIndex(int32 Index) const;
 };

@@ -2,12 +2,19 @@
 
 #include "AIController.h"
 #include "CompanionCharacterBase.h"
+#include "CollisionQueryParams.h"
+#include "Components/PrimitiveComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EngineUtils.h"
 #include "Engine/LocalPlayer.h"
+#include "Engine/TargetPoint.h"
+#include "Engine/World.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
+#include "Navigation/PathFollowingComponent.h"
+#include "NavigationSystem.h"
 #include "UObject/ConstructorHelpers.h"
 
 ACompanionSwitchPlayerController::ACompanionSwitchPlayerController()
@@ -63,6 +70,17 @@ void ACompanionSwitchPlayerController::Tick(float DeltaSeconds)
 		TimeSinceLastFollowUpdate = 0.0f;
 		UpdateFollowerMove();
 	}
+}
+
+void ACompanionSwitchPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (IsValid(GroundFollowTarget))
+	{
+		GroundFollowTarget->Destroy();
+	}
+	GroundFollowTarget = nullptr;
+	bHasGroundFollowTarget = false;
+	Super::EndPlay(EndPlayReason);
 }
 
 void ACompanionSwitchPlayerController::SetCompanionPair(ACharacter* AgilePawn, ACharacter* StrongPawn)
@@ -241,7 +259,51 @@ void ACompanionSwitchPlayerController::UpdateFollowerMove()
 		return;
 	}
 
-	const float DistanceSquared = FVector::DistSquared(Leader->GetActorLocation(), Follower->GetActorLocation());
+	if (GroundTargetLeader.Get() != Leader)
+	{
+		GroundTargetLeader = Leader;
+		bHasGroundFollowTarget = false;
+	}
+
+	FVector GroundLocation;
+	if (FindGroundBelowLeader(Leader, Follower, GroundLocation))
+	{
+		if (UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
+		{
+			FNavLocation ProjectedGround;
+			const FNavAgentProperties& Agent = Follower->GetCharacterMovement()->GetNavAgentPropertiesRef();
+			if (Navigation->ProjectPointToNavigation(GroundLocation, ProjectedGround, FVector(100.0), &Agent))
+			{
+				if (!IsValid(GroundFollowTarget))
+				{
+					FActorSpawnParameters Parameters;
+					Parameters.Owner = this;
+					Parameters.ObjectFlags |= RF_Transient;
+					Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+					GroundFollowTarget = GetWorld()->SpawnActor<ATargetPoint>(
+						ATargetPoint::StaticClass(), ProjectedGround.Location, FRotator::ZeroRotator, Parameters);
+					if (IsValid(GroundFollowTarget))
+					{
+						GroundFollowTarget->SetActorHiddenInGame(true);
+						GroundFollowTarget->SetActorEnableCollision(false);
+					}
+				}
+				if (IsValid(GroundFollowTarget))
+				{
+					GroundFollowTarget->SetActorLocation(ProjectedGround.Location);
+					bHasGroundFollowTarget = true;
+				}
+			}
+		}
+	}
+
+	// A failed trace/projection retains the last validated ground point, never an air target.
+	if (!bHasGroundFollowTarget || !IsValid(GroundFollowTarget))
+	{
+		return;
+	}
+	const float DistanceSquared = FVector::DistSquared(
+		Follower->GetCharacterMovement()->GetActorFeetLocation(), GroundFollowTarget->GetActorLocation());
 	const float StopDistance = FMath::Max(FollowAcceptanceRadius, 1.0f);
 	if (DistanceSquared <= FMath::Square(StopDistance))
 	{
@@ -249,7 +311,38 @@ void ACompanionSwitchPlayerController::UpdateFollowerMove()
 		return;
 	}
 
-	FollowerController->MoveToActor(Leader, FollowAcceptanceRadius, true, true, true, nullptr, true);
+	// MoveToActor tracks the moving ground target. Reissuing it aborts the current path,
+	// including an in-progress navigation-link traversal.
+	if (FollowerController->GetMoveStatus() == EPathFollowingStatus::Idle)
+	{
+		FollowerController->MoveToActor(GroundFollowTarget, FollowAcceptanceRadius, true, true, true, nullptr, true);
+	}
+}
+
+bool ACompanionSwitchPlayerController::FindGroundBelowLeader(
+	const ACharacter* Leader, const ACharacter* Follower, FVector& GroundLocation) const
+{
+	if (!Leader || !Leader->GetCharacterMovement() || !GetWorld())
+	{
+		return false;
+	}
+	const FVector Feet = Leader->GetCharacterMovement()->GetActorFeetLocation();
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(CompanionFollowGround), false, Leader);
+	Query.AddIgnoredActor(Follower);
+	FCollisionObjectQueryParams Objects;
+	Objects.AddObjectTypesToQuery(ECC_WorldStatic);
+	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
+	Objects.AddObjectTypesToQuery(ECC_PhysicsBody);
+	FHitResult GroundHit;
+	if (!GetWorld()->LineTraceSingleByObjectType(GroundHit, Feet + FVector::UpVector * 10.0,
+		Feet - FVector::UpVector * FMath::Max(FollowGroundSearchDepth, 100.0f), Objects, Query)
+		|| GroundHit.bStartPenetrating || !Leader->GetCharacterMovement()->IsWalkable(GroundHit)
+		|| !GroundHit.GetComponent() || GroundHit.GetComponent()->GetCollisionResponseToChannel(ECC_Pawn) != ECR_Block)
+	{
+		return false;
+	}
+	GroundLocation = GroundHit.ImpactPoint;
+	return true;
 }
 
 AAIController* ACompanionSwitchPlayerController::EnsureAIController(ACharacter* CompanionPawn) const

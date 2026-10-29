@@ -49,6 +49,31 @@ supplies the acceleration used by the template locomotion animation, instead of
 moving the follower by direct velocity while its animation remains idle. Rebuild
 after updating this C++ code, and test both followers after switching.
 
+The follow refresh also preserves an active, waiting, or paused move request rather
+than aborting and restarting it every 0.25 seconds. MoveToActor tracks a moving ground target;
+the controller retries when idle and still stops within the configured distance.
+Test sustained following and drop-link traversal in the 5.6 map after rebuilding.
+
+## Following During Player Jumps
+
+No extra Blueprint nodes or input mappings are required. The existing controller
+traces below the leader's feet and projects a walkable hit onto the follower's
+NavMesh. A single invisible, transient TargetPoint follows that ground position,
+so the AI can keep moving while the player is airborne. If the trace or projection
+fails, the last valid ground target is retained instead of chasing an air position.
+Before any valid target exists, no new move is issued.
+
+**Follow Ground Search Depth** defaults to 2000 cm and is editable on a controller
+Blueprint child. The cache resets on character switching, and the target is cleaned
+up with the controller. The configured stopping distance is measured against the
+ground target, not the jumping player's capsule. The target has no collision.
+
+Test on the PC: move and jump across a flat green NavMesh while the companion is
+several metres behind; repeat with both characters. Also test jumps in place,
+double jumps, landing on platforms, jumping over gaps, switching while airborne,
+and Stop/Play. Following still requires valid NavMesh routes; this change does not
+add AI jumping, climbing, or any new navigation links.
+
 ## Settings and Limitations
 
 Make a Blueprint child of `CompanionGameMode` to adjust Strong Companion Class or
@@ -81,12 +106,17 @@ Tab switches, NavMesh following, and Stop/Play spawning only one pair each time.
 ## Verification
 
 The native code passed UnrealHeaderTool and a Development Editor build in an
-isolated UE 5.3 compatibility project. All six `MechanicTesting` automation tests
+isolated UE 5.3 compatibility project. All seven `MechanicTesting` automation tests
 passed: three wall-run regressions plus pair/switching/smash, no-floor spawning,
-and follower acceleration for both roles.
+follower acceleration for both roles, and airborne ground-target following.
 The pair test checks 20 switches, exactly one follower AI controller, role-specific
 abilities, reuse without duplicate characters, and breakable hide/collision state.
 It uses primitive collision to avoid asynchronous asset compilation in a headless run.
+The airborne-follow test checks floor/platform traces, horizontal movement while
+airborne, bounded search depth, last-target retention, switching, cleanup, and
+preserving active/paused requests while still stopping at the ground target.
+It seeds a cached target and synthetic path because the fixture has no baked
+NavMesh. Actual NavMesh projection and path replanning need the PC Play test above.
 
 Only the verification copy used 5.3 target settings and the legacy input mapping
 path. This checkout retains its 5.6 targets and input paths. The actual Windows 5.6

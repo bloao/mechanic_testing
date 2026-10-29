@@ -12,10 +12,13 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Engine/TargetPoint.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/EngineVersionComparison.h"
+#include "Navigation/PathFollowingComponent.h"
+#include "NavigationData.h"
 
 namespace CompanionWallRunTests
 {
@@ -318,6 +321,70 @@ bool FCompanionFollowerMovementTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("AI movement supplies acceleration for the animation"), TestWorld.Movement->GetCurrentAcceleration().IsNearlyZero());
 		TestTrue(TEXT("AI movement produces forward velocity"), TestWorld.Movement->Velocity.X > 0.0);
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionAirborneFollowTest,
+	"MechanicTesting.Companions.AirborneFollowing", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionAirborneFollowTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	FTestWorld TestWorld(0.0f);
+	TestWorld.Player->UnPossess();
+	ACompanionSwitchPlayerController* CompanionController = TestWorld.World->SpawnActor<ACompanionSwitchPlayerController>();
+	CompanionController->Possess(TestWorld.Character);
+	ACompanionCharacterBase* Follower = TestWorld.World->SpawnActor<ACompanionCharacterBase>(
+		FVector(-1000.0, 0.0, 90.0), FRotator::ZeroRotator);
+	CompanionController->SetCompanionPair(TestWorld.Character, Follower);
+	FVector Ground;
+	TestTrue(TEXT("Ground is found while leader is airborne"), CompanionController->FindGroundBelowLeader(TestWorld.Character, Follower, Ground));
+	TestTrue(TEXT("Follow location is the floor, not the airborne capsule"), FMath::IsNearlyZero(Ground.Z));
+	TestWorld.Character->SetActorLocation(FVector(400.0, 0.0, 900.0));
+	TestTrue(TEXT("Ground tracking continues as the airborne leader moves"), CompanionController->FindGroundBelowLeader(TestWorld.Character, Follower, Ground));
+	TestTrue(TEXT("Ground target follows horizontal position"), FMath::IsNearlyEqual(Ground.X, 400.0));
+	TestWorld.AddBox(FVector(400.0, 0.0, 250.0), FVector(100.0, 100.0, 50.0));
+	TestTrue(TEXT("Nearest platform beneath the leader is found"), CompanionController->FindGroundBelowLeader(TestWorld.Character, Follower, Ground));
+	TestTrue(TEXT("Platform top is used rather than the floor below it"), FMath::IsNearlyEqual(Ground.Z, 300.0));
+	TestWorld.Character->SetActorLocation(FVector(400.0, 0.0, 3000.0));
+	TestFalse(TEXT("Ground search is bounded"), CompanionController->FindGroundBelowLeader(TestWorld.Character, Follower, Ground));
+
+	// Seed a previously validated target: this fixture deliberately has no baked NavMesh.
+	ATargetPoint* Target = TestWorld.World->SpawnActor<ATargetPoint>(FVector(400.0, 0.0, 300.0), FRotator::ZeroRotator);
+	CompanionController->GroundFollowTarget = Target;
+	CompanionController->GroundTargetLeader = TestWorld.Character;
+	CompanionController->bHasGroundFollowTarget = true;
+	AAIController* FollowerAI = CastChecked<AAIController>(Follower->GetController());
+	Follower->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	UPathFollowingComponent* PathFollowing = FollowerAI->GetPathFollowingComponent();
+	const FNavPathSharedPtr Path = MakeShared<FNavigationPath, ESPMode::ThreadSafe>(
+		TArray<FVector>{Follower->GetActorLocation(), Target->GetActorLocation()});
+	FAIMoveRequest Request(Target);
+	Request.SetAcceptanceRadius(250.0f);
+	const FAIRequestID MoveId = FollowerAI->RequestMove(Request, Path);
+	TestWorld.Character->SetActorLocation(FVector(400.0, 0.0, 900.0));
+	for (int32 Refresh = 0; Refresh < 4; ++Refresh) CompanionController->Tick(0.3f);
+	TestTrue(TEXT("No navigation projection retains the last valid target"), Target->GetActorLocation().Equals(FVector(400.0, 0.0, 300.0)));
+	TestTrue(TEXT("Follow refresh preserves the active request"), PathFollowing->GetCurrentRequestId() == MoveId);
+	TestTrue(TEXT("Follower remains moving while leader is airborne"), FollowerAI->GetMoveStatus() == EPathFollowingStatus::Moving);
+
+	TestWorld.Character->SetActorLocation(FVector(10000.0, 0.0, 900.0));
+	TestFalse(TEXT("A jump over empty space has no ground hit"), CompanionController->FindGroundBelowLeader(TestWorld.Character, Follower, Ground));
+	CompanionController->Tick(0.3f);
+	TestTrue(TEXT("No ground hit retains the last valid target"), Target->GetActorLocation().Equals(FVector(400.0, 0.0, 300.0)));
+	PathFollowing->PauseMove(MoveId);
+	CompanionController->Tick(0.3f);
+	TestTrue(TEXT("Follow refresh preserves paused traversal"), FollowerAI->GetMoveStatus() == EPathFollowingStatus::Paused);
+	PathFollowing->ResumeMove(MoveId);
+	Follower->SetActorLocation(Target->GetActorLocation() + FVector(0.0, 100.0, Follower->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()));
+	CompanionController->Tick(0.3f);
+	TestTrue(TEXT("Stopping distance uses the ground target, not the airborne leader"), FollowerAI->GetMoveStatus() == EPathFollowingStatus::Idle);
+	CompanionController->SwitchControlledCharacter();
+	TestFalse(TEXT("Switching clears the previous leader's cached target"), CompanionController->bHasGroundFollowTarget);
+	TestTrue(TEXT("Ground tracking now belongs to the newly controlled character"), CompanionController->GroundTargetLeader.Get() == Follower);
+	CompanionController->EndPlay(EEndPlayReason::Destroyed);
+	CompanionController->Destroy();
+	TestTrue(TEXT("The transient follow target is cleaned up with the controller"), Target->IsActorBeingDestroyed());
 	return true;
 }
 
