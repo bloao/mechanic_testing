@@ -35,15 +35,19 @@ merely placing them on a visible mesh does not guarantee navigation connectivity
 
 - The launch uses the character's existing Jump Z Velocity, Gravity Scale, capsule,
   and Max Walk Speed. No extra jump strength or double jump is granted to the AI.
-- This prototype uses a normal jump arc in either direction. Keep ordinary
-  one-way Nav Link Proxies for routes where you prefer a straight downward drop.
-- The landing surface is checked, and Unreal predicts the arc before the character
-  is launched. The full capsule is swept along the samples to reject blocked routes.
+- Destinations more than 5 cm below the character's feet use a walk-off and
+  fall, with no upward launch. Place the lower endpoint close to the ledge: this
+  does not grant extra horizontal reach or let the character cross a wide gap.
+- The landing surface is checked. For jumps, Unreal predicts the arc and the full
+  capsule is swept along the samples to reject blocked routes. Drops use normal
+  walking/falling collision and a bounded horizontal speed after leaving the edge.
 - Normal following is paused during the jump. Air steering and falling drag are
   temporarily suppressed for the calculated trajectory, then restored afterward.
 - Landing must occur near the intended destination. Timeout, possession changes,
   aborts, or link removal release the traversal and restore movement settings.
   There is no teleporting, climbing, or special jump animation added here.
+- An already-reached link endpoint is released without jumping again when path
+  following revisits the completed segment. Reverse traversal remains available.
 
 ## Debug and Test
 
@@ -72,3 +76,5 @@ UnrealHeaderTool and the Development Editor build passed. All nine MechanicTesti
 automation tests passed with zero warnings or failures. The added tests exercise
 reachable jumps for both roles, physical traversal up and down, blocked and
 unreachable routes, landing/resuming, switching possession, timeout, and cleanup.
+Drop regression checks cover no upward velocity, repeated endpoint callbacks
+without another launch, and reverse traversal after arrival.

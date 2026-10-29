@@ -423,7 +423,8 @@ bool FCompanionJumpPlanTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The normal horizontal speed limit is respected"), Velocity.Size2D() <= 500.0);
 	}
 	TestWorld.Character->SetActorLocation(FVector(500.0, 0.0, 190.0));
-	TestTrue(TEXT("The same link can plan the return jump down"), Link->BuildJumpPlan(TestWorld.Character, FVector::ZeroVector, Velocity, Landing, Reason));
+	TestTrue(TEXT("The same link can plan the return drop"), Link->BuildJumpPlan(TestWorld.Character, FVector::ZeroVector, Velocity, Landing, Reason));
+	TestTrue(TEXT("A downward route has no launch impulse"), Velocity.IsNearlyZero());
 	TestWorld.Character->SetActorLocation(FVector(0.0, 0.0, 90.0));
 	TestWorld.AddBox(FVector(1000.0, 0.0, 350.0), FVector(150.0, 300.0, 50.0));
 	TestFalse(TEXT("An unreachable height is rejected"), Link->BuildJumpPlan(TestWorld.Character, FVector(1000.0, 0.0, 400.0), Velocity, Landing, Reason));
@@ -476,14 +477,22 @@ bool FCompanionJumpTraversalTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Character reaches the upper landing"), FVector::Dist(TestWorld.Movement->GetActorFeetLocation(), FVector(500.0, 0.0, 100.0)) <= Link->LandingTolerance);
 	TestTrue(TEXT("Normal air control is restored after landing"), FMath::IsNearlyEqual(TestWorld.Movement->AirControl, 0.35f));
 	TestTrue(TEXT("Path following is no longer paused"), AI->GetMoveStatus() != EPathFollowingStatus::Paused);
+	Link->GetSmartLinkComp()->OnLinkMoveStarted(AI->GetPathFollowingComponent(), FVector(500.0, 0.0, 100.0));
+	TestTrue(TEXT("Repeating the completed link does not start a second jump"), Link->Traversals.IsEmpty());
+	TestWorld.Step(false);
+	TestTrue(TEXT("No jump is queued after arrival"), TestWorld.Movement->IsMovingOnGround());
 	StartJump(true);
+	TestTrue(TEXT("The reverse route still starts after arrival"), Link->Traversals.Contains(TestWorld.Character));
 	for (int32 Step = 0; Step < 240 && !Link->Traversals.IsEmpty(); ++Step)
 	{
 		TestWorld.Step(false);
 		Link->Tick(1.0f / 60.0f);
+		TestTrue(TEXT("Dropping never adds upward velocity"), TestWorld.Movement->Velocity.Z <= KINDA_SMALL_NUMBER);
 	}
-	TestTrue(TEXT("Return jump down completes traversal"), Link->Traversals.IsEmpty());
-	TestTrue(TEXT("Return jump reaches the lower landing"), TestWorld.Movement->GetActorFeetLocation().Size() <= Link->LandingTolerance);
+	TestTrue(TEXT("Return drop completes traversal"), Link->Traversals.IsEmpty());
+	TestTrue(TEXT("Return drop reaches the lower landing"), TestWorld.Movement->GetActorFeetLocation().Size() <= Link->LandingTolerance);
+	Link->GetSmartLinkComp()->OnLinkMoveStarted(AI->GetPathFollowingComponent(), FVector::ZeroVector);
+	TestTrue(TEXT("Repeating the completed drop does not launch again"), Link->Traversals.IsEmpty());
 	StartJump();
 	AI->UnPossess();
 	TestWorld.Player->Possess(TestWorld.Character);

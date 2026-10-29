@@ -61,6 +61,12 @@ bool ACompanionJumpNavLink::BuildJumpPlan(ACharacter* CompanionPawn, const FVect
 	const FVector Start = CompanionPawn->GetActorLocation();
 	const FVector End = LandingPoint + FVector::UpVector * (Capsule->GetScaledCapsuleHalfHeight() + 2.0f);
 	const FVector Delta = End - Start;
+	// Downward links walk off the ledge; they must not receive a jump impulse.
+	if (LandingPoint.Z < Movement->GetActorFeetLocation().Z - 5.0f)
+	{
+		Velocity = FVector::ZeroVector;
+		return true;
+	}
 	const float Gravity = -Movement->GetGravityZ();
 	const float JumpSpeed = Movement->JumpZVelocity;
 	const float Discriminant = JumpSpeed * JumpSpeed - 2.0f * Gravity * Delta.Z;
@@ -124,7 +130,7 @@ bool ACompanionJumpNavLink::BuildJumpPlan(ACharacter* CompanionPawn, const FVect
 void ACompanionJumpNavLink::HandleSmartLinkReached(AActor* Agent, const FVector& Destination)
 {
 	ACharacter* CompanionPawn = Cast<ACharacter>(Agent);
-	if (!CompanionPawn || Traversals.Contains(CompanionPawn))
+	if (!CompanionPawn)
 	{
 		return;
 	}
@@ -134,6 +140,16 @@ void ACompanionJumpNavLink::HandleSmartLinkReached(AActor* Agent, const FVector&
 	{
 		return;
 	}
+	// ResumeMove can select the just-completed custom segment again. Let normal
+	// path following advance past it instead of launching from the landing point.
+	UCharacterMovementComponent* Movement = CompanionPawn->GetCharacterMovement();
+	if (Movement->IsMovingOnGround()
+		&& FVector::Dist(Movement->GetActorFeetLocation(), Destination) <= FMath::Max(LandingTolerance, 10.0f))
+	{
+		ResumePathFollowing(CompanionPawn);
+		return;
+	}
+	if (Traversals.Contains(CompanionPawn)) return;
 	FVector Velocity;
 	FVector LandingPoint;
 	FString FailureReason;
@@ -144,11 +160,11 @@ void ACompanionJumpNavLink::HandleSmartLinkReached(AActor* Agent, const FVector&
 		return;
 	}
 
-	UCharacterMovementComponent* Movement = CompanionPawn->GetCharacterMovement();
 	FTraversal State;
 	State.Controller = AI;
 	State.RequestId = Path->GetCurrentRequestId();
 	State.LandingPoint = LandingPoint;
+	State.bDrop = Velocity.IsNearlyZero();
 	State.AirControl = Movement->AirControl;
 	State.FallingFriction = Movement->FallingLateralFriction;
 	State.FallingBraking = Movement->BrakingDecelerationFalling;
@@ -158,7 +174,7 @@ void ACompanionJumpNavLink::HandleSmartLinkReached(AActor* Agent, const FVector&
 	Movement->FallingLateralFriction = 0.0f;
 	Movement->BrakingDecelerationFalling = 0.0f;
 	CompanionPawn->StopJumping();
-	CompanionPawn->LaunchCharacter(Velocity, true, true);
+	if (!State.bDrop) CompanionPawn->LaunchCharacter(Velocity, true, true);
 	SetActorTickEnabled(true);
 }
 
@@ -214,10 +230,30 @@ void ACompanionJumpNavLink::Tick(float DeltaSeconds)
 		}
 		State.Elapsed += DeltaSeconds;
 		UCharacterMovementComponent* Movement = Pawn->GetCharacterMovement();
-		State.bWasFalling |= Movement->IsFalling();
-		if (State.bWasFalling && Movement->IsMovingOnGround())
+		if (State.bDrop && !State.bWasFalling)
 		{
-			if (FVector::Dist(Movement->GetActorFeetLocation(), State.LandingPoint) <= FMath::Max(LandingTolerance, 10.0f))
+			const FVector Delta = State.LandingPoint - Movement->GetActorFeetLocation();
+			if (Movement->IsMovingOnGround())
+			{
+				Movement->RequestPathMove(Delta.GetSafeNormal2D());
+			}
+			else if (Movement->IsFalling())
+			{
+				// Once clear of the edge, steer horizontally without an upward launch.
+				const float Gravity = -Movement->GetGravityZ();
+				const float Height = FMath::Max(-Delta.Z, 0.0);
+				const float Time = Gravity > KINDA_SMALL_NUMBER
+					? (Movement->Velocity.Z + FMath::Sqrt(FMath::Square(Movement->Velocity.Z) + 2.0f * Gravity * Height)) / Gravity : 0.0f;
+				const FVector Horizontal = (Delta.GetSafeNormal2D() * (Time > KINDA_SMALL_NUMBER ? Delta.Size2D() / Time : 0.0)).GetClampedToMaxSize(Movement->MaxWalkSpeed);
+				Movement->Velocity.X = Horizontal.X;
+				Movement->Velocity.Y = Horizontal.Y;
+			}
+		}
+		State.bWasFalling |= Movement->IsFalling();
+		const bool bAtLanding = FVector::Dist(Movement->GetActorFeetLocation(), State.LandingPoint) <= FMath::Max(LandingTolerance, 10.0f);
+		if (Movement->IsMovingOnGround() && (State.bWasFalling || (State.bDrop && bAtLanding)))
+		{
+			if (bAtLanding)
 			{
 				Finished.Add(Entry.Key);
 			}

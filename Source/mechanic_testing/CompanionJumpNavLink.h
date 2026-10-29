@@ -52,6 +52,7 @@ private:
 		float FallingBraking = 0.0f;
 		float Elapsed = 0.0f;
 		bool bWasFalling = false;
+		bool bDrop = false;
 	};
 
 	TMap<TWeakObjectPtr<ACharacter>, FTraversal> Traversals;
