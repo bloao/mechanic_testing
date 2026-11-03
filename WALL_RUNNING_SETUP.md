@@ -49,7 +49,34 @@ the manual Blueprint placement/reparenting workflow below.
 - A wall run moves at 650 cm/s with 20% of normal gravity for up to 1.5 seconds.
 - Release and press Space again to jump away. Releasing movement, losing the wall,
   reaching the time limit, landing, or switching with Tab ends the run.
-- Only one wall run is allowed per airborne period. Landing restores it.
+- Press jump during a wall run to launch across to an opposing wall while keeping
+  forward momentum. Keep holding forward; catching the opposite wall automatically
+  starts a fresh 1.5-second run. Release and press jump again for each transfer.
+  There is no total limit on successful transfers, and no landing is required.
+- The departure surface cannot be caught again during that transfer. Opposing
+  faces can belong to the same mesh/actor. Corners do not refresh the run.
+- A run that expires or ends without a wall jump cannot restart until landing.
+  Releasing forward input, disabling the ability, switching characters, or missing
+  the 1.2-second transfer window cancels the transfer. Landing resets eligibility.
+
+### Tuning wall-to-wall transfers
+
+In the character Blueprint's **Character Movement > Abilities > Wall Run**, tune
+**Wall Jump Away Speed** (default 450 cm/s), **Wall Jump Up Speed** (500 cm/s),
+and **Wall Transfer Duration** (1.2 seconds). Up speed is set on each jump rather
+than added to existing upward velocity. Transfers use normal gravity and preserve
+their forward/sideways launch momentum while forward input is held; ordinary air
+steering resumes if the transfer is cancelled or expires. Each catch clamps
+vertical speed using the existing wall-run entry rule.
+
+Start with long parallel walls about **300–350 cm apart between their inner
+faces**, at least 1000 cm tall, and hold forward while alternating jumps. Wider
+gaps need a stronger sideways launch and/or more upward speed. Jump before the
+individual run expires; each successful catch refreshes the timer. The chain has
+no counter limit, but gap width and jump timing still determine whether the player
+can keep their height. Wall detection remains local; it does not teleport or pull
+the character across a gap. The existing left/right animation state updates on
+each catch, without new input actions or animation wiring.
 
 The movement supports static, nearly vertical walls and standard downward gravity.
 There is no camera tilt or multiplayer prediction. Use the animation setup below
@@ -128,6 +155,16 @@ In Unreal's Session Frontend Automation tab, run `MechanicTesting.WallRun`.
 The tests create collision geometry without depending on project assets and cover
 both wall sides, character eligibility, AI control, jump-off, possession changes,
 duration limits, and recovery after landing.
+
+The continuous-transfer extension adds `OpposingWallChain` and `TransferExits`.
+The chain test makes twelve consecutive transfers from either starting side,
+including two opposing walls on one actor and a stronger sideways launch. Exit
+tests cover timeout, released input, disabled abilities, loss of possession, and
+explicit cancellation. The exact movement/test sources compiled in an isolated
+UE 5.3 compatibility project, and all twelve `MechanicTesting` native tests passed
+with zero test warnings or failures. Only the temporary project's target settings
+were adapted for 5.3; this checkout retains its UE 5.6 targets. Windows UE 5.6
+compilation and visual/game-feel checks still need to run on the PC.
 
 Also test in Play: both characters can jump, only the agile character can double
 jump and wall run, a wall directly ahead does not trigger a run, running off a wall

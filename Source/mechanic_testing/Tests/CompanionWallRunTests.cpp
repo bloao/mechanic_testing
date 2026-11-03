@@ -60,11 +60,12 @@ namespace CompanionWallRunTests
 			World->DestroyWorld(false);
 		}
 
-		void AddBox(const FVector& Location, const FVector& Extent)
+		UBoxComponent* AddBox(const FVector& Location, const FVector& Extent, AActor* ExistingActor = nullptr)
 		{
-			AActor* Actor = World->SpawnActor<AActor>();
+			AActor* Actor = ExistingActor ? ExistingActor : World->SpawnActor<AActor>();
 			UBoxComponent* Box = NewObject<UBoxComponent>(Actor);
-			Actor->SetRootComponent(Box);
+			if (Actor->GetRootComponent()) Box->SetupAttachment(Actor->GetRootComponent());
+			else Actor->SetRootComponent(Box);
 			Box->InitBoxExtent(Extent);
 			Box->SetWorldLocation(Location);
 			Box->SetMobility(EComponentMobility::Static);
@@ -72,6 +73,7 @@ namespace CompanionWallRunTests
 			Box->SetCollisionObjectType(ECC_WorldStatic);
 			Box->SetCollisionResponseToAllChannels(ECR_Block);
 			Box->RegisterComponent();
+			return Box;
 		}
 
 		void Step(bool bMove = true)
@@ -205,6 +207,96 @@ bool FCompanionWallRunExitTest::RunTest(const FString& Parameters)
 		TestWorld.Player->UnPossess();
 		TestFalse(TEXT("Switching away immediately ends wall run"), TestWorld.Movement->IsWallRunning());
 		TestEqual(TEXT("Switching retains normal gravity"), TestWorld.Movement->GravityScale, 1.0f);
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionWallRunChainTest,
+	"MechanicTesting.WallRun.OpposingWallChain", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionWallRunChainTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	for (float InitialSide : {1.0f, -1.0f})
+	{
+		FTestWorld TestWorld(0.0f);
+		// Also cover a diagonal launch too steep for velocity-relative side traces.
+		if (InitialSide < 0.0f) TestWorld.Movement->WallJumpAwaySpeed = 1000.0f;
+		// Both corridor faces belong to one actor: actor-based exclusion would fail.
+		UBoxComponent* FirstWall = TestWorld.AddBox(FVector(0.0, InitialSide * 75.0, 5000.0), FVector(30000.0, 10.0, 5000.0));
+		TestWorld.AddBox(FVector(0.0, -InitialSide * 275.0, 5000.0), FVector(30000.0, 10.0, 5000.0), FirstWall->GetOwner());
+		TestWorld.Step();
+		if (!TestTrue(TEXT("Initial wall run starts"), TestWorld.Movement->IsWallRunning())) return false;
+		for (int32 Transfer = 0; Transfer < 12; ++Transfer)
+		{
+			const bool bPreviousRight = TestWorld.Movement->IsWallOnRight();
+			// Spend most of the run allowance before each jump to exercise its refresh.
+			for (int32 Frame = 0; Frame < 60; ++Frame) TestWorld.Step();
+			if (!TestTrue(TEXT("Each catch grants a fresh run duration"), TestWorld.Movement->IsWallRunning())) return false;
+			const double BeforeX = TestWorld.Character->GetActorLocation().X;
+			TestWorld.Character->StopJumping();
+			TestWorld.Character->Jump();
+			TestFalse(TEXT("Jump leaves the current wall"), TestWorld.Movement->IsWallRunning());
+			TestTrue(TEXT("Vertical boost is set, not accumulated"), FMath::IsNearlyEqual(TestWorld.Movement->Velocity.Z, static_cast<double>(TestWorld.Movement->WallJumpUpSpeed)));
+			TestWorld.Step();
+			TestFalse(TEXT("Cannot immediately reattach to the departure wall"), TestWorld.Movement->IsWallRunning());
+			TestTrue(TEXT("Forward launch momentum survives falling physics"), TestWorld.Movement->Velocity.X >= TestWorld.Movement->WallRunSpeed - 1.0f);
+			TestTrue(TEXT("Sideways launch momentum survives falling physics"), FMath::Abs(TestWorld.Movement->Velocity.Y) >= TestWorld.Movement->WallJumpAwaySpeed - 1.0f);
+			for (int32 Frame = 0; Frame < 75 && !TestWorld.Movement->IsWallRunning(); ++Frame) TestWorld.Step();
+			if (!TestTrue(TEXT("Opposite wall is caught without landing"), TestWorld.Movement->IsWallRunning())) return false;
+			TestTrue(TEXT("The wall side alternates on every catch"), TestWorld.Movement->IsWallOnRight() != bPreviousRight);
+			TestTrue(TEXT("Transfer continues forward down the corridor"), TestWorld.Character->GetActorLocation().X > BeforeX);
+			TestTrue(TEXT("Chain stays airborne"), TestWorld.Movement->IsFalling());
+		}
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionWallRunTransferExitTest,
+	"MechanicTesting.WallRun.TransferExits", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionWallRunTransferExitTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	for (int32 Exit = 0; Exit < 5; ++Exit)
+	{
+		FTestWorld TestWorld;
+		TestWorld.Step();
+		TestTrue(TEXT("Jump begins a transfer"), TestWorld.Movement->JumpOffWall());
+		if (Exit == 0)
+		{
+			// Stay within reach of the departure wall beyond the transfer window.
+			TestWorld.Character->SetActorLocation(FVector(0.0, 0.0, 1500.0));
+			TestWorld.Movement->Velocity = FVector(650.0, 0.0, 0.0);
+			for (int32 Frame = 0; Frame < 80; ++Frame) TestWorld.Step();
+			TestFalse(TEXT("A missing opposite wall does not refresh the old wall"), TestWorld.Movement->IsWallRunning());
+		}
+		else if (Exit == 1) TestWorld.Step(false);
+		else if (Exit == 2)
+		{
+			TestWorld.Movement->SetWallRunEnabled(false);
+			TestWorld.Movement->SetWallRunEnabled(true);
+		}
+		else if (Exit == 3)
+		{
+			TestWorld.Player->UnPossess();
+		}
+		else TestWorld.Movement->StopWallRun();
+		// Put an opposing face within reach without landing. A cancelled/expired
+		// transfer must not leave a latent permission to restart wall running.
+		TestWorld.AddBox(FVector(0.0, -75.0, 1000.0), FVector(5000.0, 10.0, 1000.0));
+		TestWorld.Character->SetActorLocation(FVector(0.0, 0.0, 500.0));
+		TestWorld.Movement->Velocity = FVector(650.0, 0.0, 0.0);
+		TestWorld.Step();
+		TestFalse(FString::Printf(TEXT("Expired or cancelled transfer cannot catch another wall (exit %d)"), Exit), TestWorld.Movement->IsWallRunning());
+		// Possess restarts ACharacter and restores its default movement mode. Do
+		// that only for the landing reset, after checking the unpossessed transfer.
+		if (Exit == 3) TestWorld.Player->Possess(TestWorld.Character);
+		TestWorld.Movement->SetMovementMode(MOVE_Walking);
+		TestWorld.Movement->SetMovementMode(MOVE_Falling);
+		TestWorld.Movement->Velocity = FVector(650.0, 0.0, 0.0);
+		TestWorld.Step();
+		TestTrue(FString::Printf(TEXT("Landing resets eligibility after a cancelled transfer (exit %d)"), Exit), TestWorld.Movement->IsWallRunning());
 	}
 	return true;
 }
