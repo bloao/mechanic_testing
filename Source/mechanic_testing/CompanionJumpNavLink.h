@@ -60,6 +60,9 @@ private:
 		bool bSecondJumpUsed = false;
 		bool bWasFalling = false;
 		bool bDrop = false;
+		bool bOrientRotationToMovement = false;
+		bool bUseControllerDesiredRotation = false;
+		bool bUseControllerRotationYaw = false;
 	};
 
 	TMap<TWeakObjectPtr<ACharacter>, FTraversal> Traversals;

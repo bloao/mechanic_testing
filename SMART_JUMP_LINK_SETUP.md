@@ -55,6 +55,10 @@ merely placing them on a visible mesh does not guarantee navigation connectivity
   walking/falling collision and a bounded horizontal speed after leaving the edge.
 - Normal following is paused during the jump. Air steering and falling drag are
   temporarily suppressed for the calculated trajectory, then restored afterward.
+- The companion faces the takeoff/drop direction before traversal, then faces its
+  horizontal travel while airborne and stays upright. Conflicting controller-yaw
+  and movement-rotation modes are suspended for the traversal and restored on
+  landing, timeout, abort, possession change, or link removal. No extra setup is needed.
 - Landing must occur near the intended destination. Timeout, possession changes,
   aborts, or link removal release the traversal and restore movement settings.
   There is no teleporting, climbing, or special jump animation added here.
@@ -110,3 +114,6 @@ Windows UE 5.6 still require the level test above.
 The attempt-mode test checks that both roles launch on an unreachable upward link,
 Agile schedules a second jump, strict mode remains available, and switching to
 player control cancels the pending attempt.
+Facing regressions start the character looking away, give its AI a conflicting
+focus, and check forward jumps, reverse drops, double jumps, and rotation-setting
+restoration on landing, possession changes, timeout, and link removal.

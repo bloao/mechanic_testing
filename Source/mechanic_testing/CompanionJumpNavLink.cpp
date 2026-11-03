@@ -13,6 +13,16 @@
 #include "NavLinkCustomComponent.h"
 #include "Navigation/PathFollowingComponent.h"
 
+static void FaceJumpTravel(ACharacter* CompanionPawn, const FVector& Direction)
+{
+	const FVector Horizontal = Direction.GetSafeNormal2D();
+	if (!Horizontal.IsNearlyZero())
+	{
+		// Face the horizontal trajectory while keeping the character upright.
+		CompanionPawn->SetActorRotation(FRotator(0.0, Horizontal.Rotation().Yaw, 0.0));
+	}
+}
+
 ACompanionJumpNavLink::ACompanionJumpNavLink(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -233,11 +243,20 @@ void ACompanionJumpNavLink::HandleSmartLinkReached(AActor* Agent, const FVector&
 	State.AirControl = Movement->AirControl;
 	State.FallingFriction = Movement->FallingLateralFriction;
 	State.FallingBraking = Movement->BrakingDecelerationFalling;
+	State.bOrientRotationToMovement = Movement->bOrientRotationToMovement;
+	State.bUseControllerDesiredRotation = Movement->bUseControllerDesiredRotation;
+	State.bUseControllerRotationYaw = CompanionPawn->bUseControllerRotationYaw;
 	Path->PauseMove(State.RequestId, EPathFollowingVelocityMode::Keep);
 	Traversals.Add(CompanionPawn, State);
 	Movement->AirControl = 0.0f;
 	Movement->FallingLateralFriction = 0.0f;
 	Movement->BrakingDecelerationFalling = 0.0f;
+	// Path-following focus and normal acceleration-based turning must not rotate
+	// the pawn away from a scripted jump while its movement request is paused.
+	Movement->bOrientRotationToMovement = false;
+	Movement->bUseControllerDesiredRotation = false;
+	CompanionPawn->bUseControllerRotationYaw = false;
+	FaceJumpTravel(CompanionPawn, State.bDrop ? ToDestination : Velocity);
 	CompanionPawn->StopJumping();
 	if (!State.bDrop)
 	{
@@ -261,6 +280,9 @@ void ACompanionJumpNavLink::FinishTraversal(TWeakObjectPtr<ACharacter> Companion
 		Movement->AirControl = State.AirControl;
 		Movement->FallingLateralFriction = State.FallingFriction;
 		Movement->BrakingDecelerationFalling = State.FallingBraking;
+		Movement->bOrientRotationToMovement = State.bOrientRotationToMovement;
+		Movement->bUseControllerDesiredRotation = State.bUseControllerDesiredRotation;
+		Pawn->bUseControllerRotationYaw = State.bUseControllerRotationYaw;
 		if (AAIController* AI = State.Controller.Get(); AI && Pawn->GetController() == AI)
 		{
 			UPathFollowingComponent* Path = AI->GetPathFollowingComponent();
@@ -348,6 +370,12 @@ void ACompanionJumpNavLink::Tick(float DeltaSeconds)
 				Movement->Velocity.Y = Horizontal.Y;
 			}
 		}
+		FVector FacingDirection = Movement->Velocity.GetSafeNormal2D();
+		if (FacingDirection.IsNearlyZero() || (State.bDrop && Movement->IsMovingOnGround()))
+		{
+			FacingDirection = State.LandingPoint - Movement->GetActorFeetLocation();
+		}
+		FaceJumpTravel(Pawn, FacingDirection);
 		State.bWasFalling |= Movement->IsFalling();
 		const bool bAtLanding = FVector::Dist(Movement->GetActorFeetLocation(), State.LandingPoint) <= FMath::Max(LandingTolerance, 10.0f);
 		if (Movement->IsMovingOnGround() && (State.bWasFalling || (State.bDrop && bAtLanding)))

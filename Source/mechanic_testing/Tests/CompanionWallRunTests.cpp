@@ -576,6 +576,9 @@ bool FCompanionJumpTraversalTest::RunTest(const FString& Parameters)
 	TestWorld.Movement->JumpZVelocity = 700.0f;
 	TestWorld.Movement->MaxWalkSpeed = 500.0f;
 	TestWorld.Movement->AirControl = 0.35f;
+	TestWorld.Movement->bOrientRotationToMovement = true;
+	TestWorld.Movement->bUseControllerDesiredRotation = true;
+	TestWorld.Character->bUseControllerRotationYaw = true;
 	ACompanionJumpNavLink* Link = TestWorld.World->SpawnActor<ACompanionJumpNavLink>();
 	Link->DispatchBeginPlay();
 	const auto StartJump = [&](bool bReturn = false)
@@ -585,6 +588,10 @@ bool FCompanionJumpTraversalTest::RunTest(const FString& Parameters)
 		TestWorld.Movement->SetMovementMode(MOVE_Walking);
 		TestWorld.Movement->Velocity = FVector::ZeroVector;
 		if (AI->GetPawn() != TestWorld.Character) AI->Possess(TestWorld.Character);
+		// Start facing away and give the controller a conflicting focus. The link
+		// must own yaw during the traversal without permanently changing settings.
+		TestWorld.Character->SetActorRotation(FRotator(0.0, bReturn ? 0.0 : 180.0, 0.0));
+		AI->SetFocalPoint(bReturn ? FVector(2000.0, 0.0, 100.0) : FVector(-2000.0, 0.0, 0.0), EAIFocusPriority::Gameplay);
 		FAIMoveRequest Request(Destination);
 		Request.SetAcceptanceRadius(50.0f);
 		AI->RequestMove(Request, MakeShared<FNavigationPath, ESPMode::ThreadSafe>(
@@ -593,28 +600,37 @@ bool FCompanionJumpTraversalTest::RunTest(const FString& Parameters)
 		Link->GetSmartLinkComp()->OnLinkMoveStarted(AI->GetPathFollowingComponent(), Destination);
 	};
 	StartJump();
+	TestTrue(TEXT("Jump faces forward before takeoff even when initially facing away"), TestWorld.Character->GetActorForwardVector().X > 0.99);
 	TestTrue(TEXT("Smart-link callback starts traversal"), Link->Traversals.Contains(TestWorld.Character));
 	TestTrue(TEXT("Path following is paused during the jump"), AI->GetMoveStatus() == EPathFollowingStatus::Paused);
 	for (int32 Step = 0; Step < 240 && !Link->Traversals.IsEmpty(); ++Step)
 	{
+		AI->UpdateControlRotation(1.0f / 60.0f, true);
 		TestWorld.Step(false);
 		Link->Tick(1.0f / 60.0f);
+		TestTrue(TEXT("Jump stays aligned despite a conflicting AI focus"), TestWorld.Character->GetActorForwardVector().X > 0.99);
 	}
 	TestTrue(TEXT("Landing completes traversal"), Link->Traversals.IsEmpty());
 	TestTrue(TEXT("Character reaches the upper landing"), FVector::Dist(TestWorld.Movement->GetActorFeetLocation(), FVector(500.0, 0.0, 100.0)) <= Link->LandingTolerance);
 	TestTrue(TEXT("Normal air control is restored after landing"), FMath::IsNearlyEqual(TestWorld.Movement->AirControl, 0.35f));
+	TestTrue(TEXT("Landing restores movement orientation"), TestWorld.Movement->bOrientRotationToMovement);
+	TestTrue(TEXT("Landing restores controller desired rotation"), TestWorld.Movement->bUseControllerDesiredRotation);
+	TestTrue(TEXT("Landing restores controller yaw"), TestWorld.Character->bUseControllerRotationYaw);
 	TestTrue(TEXT("Path following is no longer paused"), AI->GetMoveStatus() != EPathFollowingStatus::Paused);
 	Link->GetSmartLinkComp()->OnLinkMoveStarted(AI->GetPathFollowingComponent(), FVector(500.0, 0.0, 100.0));
 	TestTrue(TEXT("Repeating the completed link does not start a second jump"), Link->Traversals.IsEmpty());
 	TestWorld.Step(false);
 	TestTrue(TEXT("No jump is queued after arrival"), TestWorld.Movement->IsMovingOnGround());
 	StartJump(true);
+	TestTrue(TEXT("Drop faces the reverse direction before stepping off"), TestWorld.Character->GetActorForwardVector().X < -0.99);
 	TestTrue(TEXT("The reverse route still starts after arrival"), Link->Traversals.Contains(TestWorld.Character));
 	for (int32 Step = 0; Step < 240 && !Link->Traversals.IsEmpty(); ++Step)
 	{
+		AI->UpdateControlRotation(1.0f / 60.0f, true);
 		TestWorld.Step(false);
 		Link->Tick(1.0f / 60.0f);
 		TestTrue(TEXT("Dropping never adds upward velocity"), TestWorld.Movement->Velocity.Z <= KINDA_SMALL_NUMBER);
+		TestTrue(TEXT("Drop stays aligned despite a conflicting AI focus"), TestWorld.Character->GetActorForwardVector().X < -0.99);
 	}
 	TestTrue(TEXT("Return drop completes traversal"), Link->Traversals.IsEmpty());
 	TestTrue(TEXT("Return drop reaches the lower landing"), TestWorld.Movement->GetActorFeetLocation().Size() <= Link->LandingTolerance);
@@ -626,6 +642,8 @@ bool FCompanionJumpTraversalTest::RunTest(const FString& Parameters)
 	Link->Tick(1.0f / 60.0f);
 	TestTrue(TEXT("Changing possession cancels link ownership"), Link->Traversals.IsEmpty());
 	TestTrue(TEXT("Player regains normal air control"), FMath::IsNearlyEqual(TestWorld.Movement->AirControl, 0.35f));
+	TestTrue(TEXT("Possession change restores movement orientation"), TestWorld.Movement->bOrientRotationToMovement);
+	TestTrue(TEXT("Possession change restores controller yaw"), TestWorld.Character->bUseControllerRotationYaw);
 	TestEqual(TEXT("Player possession is not disturbed"), TestWorld.Character->GetController(), static_cast<AController*>(TestWorld.Player));
 	TestWorld.Player->UnPossess();
 	StartJump();
@@ -634,10 +652,12 @@ bool FCompanionJumpTraversalTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Timeout clears traversal"), Link->Traversals.IsEmpty());
 	TestTrue(TEXT("Timeout aborts the AI move"), AI->GetMoveStatus() == EPathFollowingStatus::Idle);
 	TestTrue(TEXT("Timeout restores movement settings"), FMath::IsNearlyEqual(TestWorld.Movement->AirControl, 0.35f));
+	TestTrue(TEXT("Timeout restores controller desired rotation"), TestWorld.Movement->bUseControllerDesiredRotation);
 	StartJump();
 	Link->EndPlay(EEndPlayReason::Destroyed);
 	TestTrue(TEXT("Removing the link clears traversal"), Link->Traversals.IsEmpty());
 	TestTrue(TEXT("Removing the link restores movement settings"), FMath::IsNearlyEqual(TestWorld.Movement->AirControl, 0.35f));
+	TestTrue(TEXT("Removing the link restores movement orientation"), TestWorld.Movement->bOrientRotationToMovement);
 	return true;
 }
 
@@ -688,14 +708,17 @@ bool FCompanionDoubleJumpTest::RunTest(const FString& Parameters)
 		Request.SetAcceptanceRadius(20.0f);
 		AI->RequestMove(Request, MakeShared<FNavigationPath, ESPMode::ThreadSafe>(
 			TArray<FVector>{TestWorld.Movement->GetActorFeetLocation(), Destination}));
+		TestWorld.Character->SetActorRotation(FRotator(0.0, 180.0, 0.0));
 		Link->GetSmartLinkComp()->OnLinkMoveStarted(AI->GetPathFollowingComponent(), Destination);
 		if (!TestTrue(TEXT("Double-jump traversal starts"), Link->Traversals.Contains(TestWorld.Character))) return false;
+		TestTrue(TEXT("Double jump faces its launch direction"), TestWorld.Character->GetActorForwardVector().X > 0.99);
 		bool bSawSecondJump = false;
 		int32 MaxJumpCountSeen = 0;
 		for (int32 Step = 0; Step < 240 && !Link->Traversals.IsEmpty(); ++Step)
 		{
 			TestWorld.Step(false, StepTime);
 			Link->Tick(StepTime);
+			TestTrue(TEXT("Double jump keeps facing its travel direction"), TestWorld.Character->GetActorForwardVector().X > 0.99);
 			MaxJumpCountSeen = FMath::Max(MaxJumpCountSeen, TestWorld.Character->JumpCurrentCount);
 			if (const ACompanionJumpNavLink::FTraversal* State = Link->Traversals.Find(TestWorld.Character))
 			{
