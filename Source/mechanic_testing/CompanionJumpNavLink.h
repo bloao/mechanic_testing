@@ -41,6 +41,7 @@ public:
 private:
 	friend class FCompanionJumpPlanTest;
 	friend class FCompanionJumpTraversalTest;
+	friend class FCompanionDoubleJumpTest;
 
 	struct FTraversal
 	{
@@ -51,6 +52,8 @@ private:
 		float FallingFriction = 0.0f;
 		float FallingBraking = 0.0f;
 		float Elapsed = 0.0f;
+		float SecondJumpTime = -1.0f;
+		bool bSecondJumpUsed = false;
 		bool bWasFalling = false;
 		bool bDrop = false;
 	};
@@ -62,7 +65,7 @@ private:
 	void HandleSmartLinkReached(AActor* Agent, const FVector& Destination);
 
 	bool BuildJumpPlan(ACharacter* CompanionPawn, const FVector& Destination,
-		FVector& Velocity, FVector& LandingPoint, FString& FailureReason) const;
+		FVector& Velocity, FVector& LandingPoint, FString& FailureReason, float* SecondJumpTime = nullptr) const;
 	void FinishTraversal(TWeakObjectPtr<ACharacter> CompanionPawn, bool bSuccess);
 	void WarnRejected(const FString& Reason);
 };

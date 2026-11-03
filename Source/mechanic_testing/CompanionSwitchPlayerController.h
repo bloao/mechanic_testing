@@ -85,11 +85,13 @@ private:
 
 	int32 ControlledCompanionIndex;
 	float TimeSinceLastFollowUpdate;
+	double LastFollowDebugTime = -DBL_MAX;
 
 	void EnsureTwoCompanions();
 	void ApplyCompanionAbilitySettings();
 	void PossessCompanionAtIndex(int32 NewIndex);
 	void UpdateFollowerMove();
+	void LogFollowStatus(const TCHAR* Status);
 	bool FindGroundBelowLeader(const ACharacter* Leader, const ACharacter* Follower, FVector& GroundLocation) const;
 	AAIController* EnsureAIController(ACharacter* CompanionPawn) const;
 	ACharacter* GetCompanionAtIndex(int32 Index) const;

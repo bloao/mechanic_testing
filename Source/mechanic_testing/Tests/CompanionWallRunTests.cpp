@@ -16,6 +16,7 @@
 #include "Engine/TargetPoint.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/WorldSettings.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/EngineVersionComparison.h"
 #include "Navigation/PathFollowingComponent.h"
@@ -76,7 +77,7 @@ namespace CompanionWallRunTests
 			return Box;
 		}
 
-		void Step(bool bMove = true)
+		void Step(bool bMove = true, float DeltaTime = 1.0f / 60.0f)
 		{
 			if (bMove)
 			{
@@ -84,7 +85,7 @@ namespace CompanionWallRunTests
 			}
 			const FVector Input = Character->GetPendingMovementInputVector();
 			// Advance movement directly; repeated world ticks in one engine frame are deduplicated.
-			Movement->TickComponent(1.0f / 60.0f, LEVELTICK_All, &Movement->PrimaryComponentTick);
+			Movement->TickComponent(DeltaTime, LEVELTICK_All, &Movement->PrimaryComponentTick);
 			if (bFirstStep && bMove && Movement->bCanWallRun && !Movement->IsWallRunning() && Cast<APlayerController>(Character->GetController()))
 			{
 				FHitResult RightHit;
@@ -493,6 +494,11 @@ bool FCompanionAirborneFollowTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("A jump over empty space has no ground hit"), CompanionController->FindGroundBelowLeader(TestWorld.Character, Follower, Ground));
 	CompanionController->Tick(0.3f);
 	TestTrue(TEXT("No ground hit retains the last valid target"), Target->GetActorLocation().Equals(FVector(400.0, 0.0, 300.0)));
+	Follower->SetActorLocation(Target->GetActorLocation() + FVector(0.0, 100.0,
+		Follower->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - 100.0));
+	CompanionController->Tick(0.3f);
+	TestTrue(TEXT("Being close on a lower platform does not stop the follow request"), FollowerAI->GetMoveStatus() == EPathFollowingStatus::Moving);
+	TestFalse(TEXT("Native path reach checks also reject a different-height platform"), PathFollowing->HasReached(Request));
 	PathFollowing->PauseMove(MoveId);
 	Follower->SetActorLocation(Target->GetActorLocation() + FVector(0.0, 100.0, Follower->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()));
 	CompanionController->Tick(0.3f);
@@ -537,7 +543,9 @@ bool FCompanionJumpPlanTest::RunTest(const FString& Parameters)
 	for (bool bAgile : {true, false})
 	{
 		TestWorld.Character->ConfigureAgileAbilities(bAgile);
-		TestTrue(TEXT("A reachable upward jump is planned for either role"), Link->BuildJumpPlan(TestWorld.Character, FVector(500.0, 0.0, 100.0), Velocity, Landing, Reason));
+		float SecondJumpTime = -1.0f;
+		TestTrue(TEXT("A reachable upward jump is planned for either role"), Link->BuildJumpPlan(TestWorld.Character, FVector(500.0, 0.0, 100.0), Velocity, Landing, Reason, &SecondJumpTime));
+		TestTrue(TEXT("A normal reachable jump does not spend a second jump"), SecondJumpTime < 0.0f);
 		TestTrue(TEXT("The normal vertical jump speed is respected"), FMath::IsNearlyEqual(Velocity.Z, 700.0));
 		TestTrue(TEXT("The normal horizontal speed limit is respected"), Velocity.Size2D() <= 500.0);
 	}
@@ -630,6 +638,88 @@ bool FCompanionJumpTraversalTest::RunTest(const FString& Parameters)
 	Link->EndPlay(EEndPlayReason::Destroyed);
 	TestTrue(TEXT("Removing the link clears traversal"), Link->Traversals.IsEmpty());
 	TestTrue(TEXT("Removing the link restores movement settings"), FMath::IsNearlyEqual(TestWorld.Movement->AirControl, 0.35f));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionDoubleJumpTest,
+	"MechanicTesting.Companions.AgileDoubleJump", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionDoubleJumpTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	for (float StepTime : {1.0f / 30.0f, 1.0f / 60.0f, 1.0f / 120.0f})
+	{
+		FTestWorld TestWorld(0.0f);
+		AWorldSettings* Settings = TestWorld.World->GetWorldSettings();
+		Settings->bGlobalGravitySet = true;
+		Settings->GlobalGravityZ = -1200.0f;
+		Settings->WorldGravityZ = -1200.0f;
+		TestWorld.Player->UnPossess();
+		AAIController* AI = TestWorld.World->SpawnActor<AAIController>();
+		AI->Possess(TestWorld.Character);
+		TestWorld.Movement->JumpZVelocity = 700.0f;
+		TestWorld.Movement->MaxWalkSpeed = 500.0f;
+		TestWorld.Movement->AirControl = 0.35f;
+		TestWorld.Movement->FallingLateralFriction = 0.15f;
+		TestWorld.Movement->BrakingDecelerationFalling = 50.0f;
+		TestWorld.Character->SetActorLocation(FVector(0.0, 0.0, 90.0));
+		TestWorld.Movement->SetMovementMode(MOVE_Walking);
+		TestWorld.Movement->Velocity = FVector::ZeroVector;
+		TestWorld.AddBox(FVector(450.0, 0.0, 160.0), FVector(160.0, 300.0, 160.0));
+		ACompanionJumpNavLink* Link = TestWorld.World->SpawnActor<ACompanionJumpNavLink>();
+		Link->DispatchBeginPlay();
+		const FVector Destination(450.0, 0.0, 320.0);
+		FVector Velocity;
+		FVector Landing;
+		FString Reason;
+		float BoostTime = -1.0f;
+		TestWorld.Character->ConfigureAgileAbilities(false);
+		TestFalse(TEXT("Strong cannot reach a platform requiring a second jump"), Link->BuildJumpPlan(TestWorld.Character, Destination, Velocity, Landing, Reason, &BoostTime));
+		TestWorld.Character->ConfigureAgileAbilities(true);
+		if (!TestTrue(TEXT("Agile plans a reachable double jump at gravity -1200"), Link->BuildJumpPlan(TestWorld.Character, Destination, Velocity, Landing, Reason, &BoostTime)))
+		{
+			AddError(Reason);
+			return false;
+		}
+		TestTrue(TEXT("The second jump is delayed until airborne"), BoostTime > 0.0f);
+		TestTrue(TEXT("Double jump keeps normal vertical jump strength"), FMath::IsNearlyEqual(Velocity.Z, 700.0));
+		TestTrue(TEXT("Double jump respects horizontal speed"), Velocity.Size2D() <= 500.0f);
+		FAIMoveRequest Request(Destination);
+		Request.SetAcceptanceRadius(20.0f);
+		AI->RequestMove(Request, MakeShared<FNavigationPath, ESPMode::ThreadSafe>(
+			TArray<FVector>{TestWorld.Movement->GetActorFeetLocation(), Destination}));
+		Link->GetSmartLinkComp()->OnLinkMoveStarted(AI->GetPathFollowingComponent(), Destination);
+		if (!TestTrue(TEXT("Double-jump traversal starts"), Link->Traversals.Contains(TestWorld.Character))) return false;
+		bool bSawSecondJump = false;
+		int32 MaxJumpCountSeen = 0;
+		for (int32 Step = 0; Step < 240 && !Link->Traversals.IsEmpty(); ++Step)
+		{
+			TestWorld.Step(false, StepTime);
+			Link->Tick(StepTime);
+			MaxJumpCountSeen = FMath::Max(MaxJumpCountSeen, TestWorld.Character->JumpCurrentCount);
+			if (const ACompanionJumpNavLink::FTraversal* State = Link->Traversals.Find(TestWorld.Character))
+			{
+				bSawSecondJump |= State->bSecondJumpUsed;
+			}
+		}
+		TestTrue(TEXT("A second jump was actually performed"), bSawSecondJump);
+		TestEqual(TEXT("Only two jumps are consumed"), MaxJumpCountSeen, 2);
+		TestTrue(TEXT("Double jump finishes without a stuck traversal"), Link->Traversals.IsEmpty());
+		TestTrue(TEXT("Agile lands on the upper platform"), TestWorld.Movement->IsMovingOnGround()
+			&& FVector::Dist(TestWorld.Movement->GetActorFeetLocation(), Destination) <= Link->LandingTolerance);
+		TestTrue(TEXT("Air control is restored"), FMath::IsNearlyEqual(TestWorld.Movement->AirControl, 0.35f));
+		TestTrue(TEXT("Falling friction is restored"), FMath::IsNearlyEqual(TestWorld.Movement->FallingLateralFriction, 0.15f));
+		TestTrue(TEXT("Falling braking is restored"), FMath::IsNearlyEqual(TestWorld.Movement->BrakingDecelerationFalling, 50.0f));
+		TestTrue(TEXT("Path following resumes"), AI->GetMoveStatus() != EPathFollowingStatus::Paused);
+		// Restore the starting state, and check a low ceiling rejects both possible arcs.
+		TestWorld.Character->SetActorLocation(FVector(0.0, 0.0, 90.0));
+		TestWorld.Movement->SetMovementMode(MOVE_Walking);
+		TestWorld.Movement->Velocity = FVector::ZeroVector;
+		TestWorld.AddBox(FVector(3000.0, 0.0, 160.0), FVector(160.0, 300.0, 160.0));
+		TestFalse(TEXT("A double jump still rejects excessive horizontal distance"), Link->BuildJumpPlan(TestWorld.Character, FVector(3000.0, 0.0, 320.0), Velocity, Landing, Reason, &BoostTime));
+		TestWorld.AddBox(FVector(0.0, 0.0, 240.0), FVector(250.0, 300.0, 10.0));
+		TestFalse(TEXT("Double jump cannot bypass a blocking ceiling"), Link->BuildJumpPlan(TestWorld.Character, Destination, Velocity, Landing, Reason, &BoostTime));
+	}
 	return true;
 }
 

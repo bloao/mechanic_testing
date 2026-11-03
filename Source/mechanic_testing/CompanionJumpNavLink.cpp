@@ -9,6 +9,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/EngineVersionComparison.h"
 #include "NavLinkCustomComponent.h"
 #include "Navigation/PathFollowingComponent.h"
 
@@ -37,8 +38,9 @@ void ACompanionJumpNavLink::BeginPlay()
 }
 
 bool ACompanionJumpNavLink::BuildJumpPlan(ACharacter* CompanionPawn, const FVector& Destination,
-	FVector& Velocity, FVector& LandingPoint, FString& FailureReason) const
+	FVector& Velocity, FVector& LandingPoint, FString& FailureReason, float* SecondJumpTime) const
 {
+	if (SecondJumpTime) *SecondJumpTime = -1.0f;
 	if (!IsValid(CompanionPawn) || !CompanionPawn->GetCharacterMovement()->IsMovingOnGround())
 	{
 		FailureReason = TEXT("the character must start on the ground");
@@ -69,62 +71,93 @@ bool ACompanionJumpNavLink::BuildJumpPlan(ACharacter* CompanionPawn, const FVect
 	}
 	const float Gravity = -Movement->GetGravityZ();
 	const float JumpSpeed = Movement->JumpZVelocity;
-	const float Discriminant = JumpSpeed * JumpSpeed - 2.0f * Gravity * Delta.Z;
-	if (Gravity <= KINDA_SMALL_NUMBER || JumpSpeed <= 0.0f || Discriminant < 0.0f)
+	if (Gravity <= KINDA_SMALL_NUMBER || JumpSpeed <= 0.0f || !CompanionPawn->CanJump())
 	{
-		FailureReason = TEXT("the landing is above this character's normal jump height");
+		FailureReason = TEXT("the character cannot jump with its current movement settings");
 		return false;
 	}
 
-	// Use the character's normal vertical jump speed, solving for the descending landing time.
-	const float FlightTime = (JumpSpeed + FMath::Sqrt(Discriminant)) / Gravity;
-	if (FlightTime <= KINDA_SMALL_NUMBER || FlightTime + 0.25f >= FMath::Max(TraversalTimeout, 1.0f))
-	{
-		FailureReason = TEXT("the jump exceeds the traversal timeout");
-		return false;
-	}
-	Velocity = FVector(Delta.X / FlightTime, Delta.Y / FlightTime, JumpSpeed);
-	if (Velocity.Size2D() > Movement->MaxWalkSpeed)
-	{
-		FailureReason = TEXT("the landing is too far for this character's normal movement speed");
-		return false;
-	}
-
-	// Let Unreal sample the ballistic arc, then sweep the full character capsule along it.
-	FPredictProjectilePathParams Parameters;
-	Parameters.StartLocation = Start;
-	Parameters.LaunchVelocity = Velocity;
-	Parameters.OverrideGravityZ = Movement->GetGravityZ();
-	Parameters.MaxSimTime = FlightTime;
-	Parameters.SimFrequency = 30.0f;
-	Parameters.bTraceWithCollision = false;
-	FPredictProjectilePathResult Prediction;
-	UGameplayStatics::PredictProjectilePath(this, Parameters, Prediction);
-	if (Prediction.PathData.Num() < 2)
-	{
-		FailureReason = TEXT("could not predict a jump trajectory");
-		return false;
-	}
 	const FCollisionShape Shape = FCollisionShape::MakeCapsule(
 		Capsule->GetScaledCapsuleRadius(), Capsule->GetScaledCapsuleHalfHeight());
-	for (int32 Index = 1; Index < Prediction.PathData.Num(); ++Index)
+	const auto CheckArc = [&](const FVector& ArcStart, const FVector& ArcVelocity, float Duration)
 	{
-		const FVector From = Prediction.PathData[Index - 1].Location;
-		const FVector To = Prediction.PathData[Index].Location;
-		FHitResult Hit;
-		const bool bBlocked = GetWorld()->SweepSingleByProfile(
-			Hit, From, To, FQuat::Identity, Capsule->GetCollisionProfileName(), Shape, Query);
-		if (bDrawJumpDebug)
+		FPredictProjectilePathParams Parameters;
+		Parameters.StartLocation = ArcStart;
+		Parameters.LaunchVelocity = ArcVelocity;
+		Parameters.OverrideGravityZ = Movement->GetGravityZ();
+		Parameters.MaxSimTime = Duration;
+		Parameters.SimFrequency = 60.0f;
+		Parameters.bTraceWithCollision = false;
+		FPredictProjectilePathResult Prediction;
+		UGameplayStatics::PredictProjectilePath(this, Parameters, Prediction);
+		if (Prediction.PathData.Num() < 2)
 		{
-			DrawDebugLine(GetWorld(), From, To, bBlocked ? FColor::Red : FColor::Green, false, 3.0f);
-		}
-		if (bBlocked)
-		{
-			FailureReason = FString::Printf(TEXT("the jump arc is blocked by %s"), *GetNameSafe(Hit.GetActor()));
+			FailureReason = TEXT("could not predict a jump trajectory");
 			return false;
 		}
+		for (int32 Index = 1; Index < Prediction.PathData.Num(); ++Index)
+		{
+			const FVector From = Prediction.PathData[Index - 1].Location;
+			const FVector To = Prediction.PathData[Index].Location;
+			FHitResult Hit;
+			const bool bBlocked = GetWorld()->SweepSingleByProfile(
+				Hit, From, To, FQuat::Identity, Capsule->GetCollisionProfileName(), Shape, Query);
+			if (bDrawJumpDebug) DrawDebugLine(GetWorld(), From, To, bBlocked ? FColor::Red : FColor::Green, false, 3.0f);
+			if (bBlocked)
+			{
+				FailureReason = FString::Printf(TEXT("the jump arc is blocked by %s"), *GetNameSafe(Hit.GetActor()));
+				return false;
+			}
+		}
+		return true;
+	};
+
+	// Prefer one normal jump. If necessary, search bounded second-jump timings
+	// during ascent, up to the apex. Both impulses use the normal JumpZVelocity.
+	const auto TryPlan = [&](float BoostTime)
+	{
+		const float FirstHeight = BoostTime > 0.0f ? JumpSpeed * BoostTime - 0.5f * Gravity * BoostTime * BoostTime : 0.0f;
+		const float Discriminant = JumpSpeed * JumpSpeed - 2.0f * Gravity * (Delta.Z - FirstHeight);
+		if (Discriminant < 0.0f)
+		{
+			FailureReason = TEXT("the landing is above this character's available jump height");
+			return false;
+		}
+		const float LastFlightTime = (JumpSpeed + FMath::Sqrt(Discriminant)) / Gravity;
+		const float FlightTime = FMath::Max(BoostTime, 0.0f) + LastFlightTime;
+		if (LastFlightTime <= KINDA_SMALL_NUMBER || FlightTime + 0.25f >= FMath::Max(TraversalTimeout, 1.0f))
+		{
+			FailureReason = TEXT("the jump exceeds the traversal timeout");
+			return false;
+		}
+		const FVector Launch(Delta.X / FlightTime, Delta.Y / FlightTime, JumpSpeed);
+		if (Launch.Size2D() > Movement->MaxWalkSpeed)
+		{
+			FailureReason = TEXT("the landing is too far for this character's normal movement speed");
+			return false;
+		}
+		if (BoostTime > 0.0f)
+		{
+			if (!CheckArc(Start, Launch, BoostTime)) return false;
+			FVector BoostLocation = Start + Launch * BoostTime;
+			BoostLocation.Z = Start.Z + FirstHeight;
+			if (!CheckArc(BoostLocation, Launch, LastFlightTime)) return false;
+		}
+		else if (!CheckArc(Start, Launch, FlightTime)) return false;
+		Velocity = Launch;
+		if (SecondJumpTime) *SecondJumpTime = BoostTime;
+		FailureReason.Reset();
+		return true;
+	};
+	if (TryPlan(-1.0f)) return true;
+	if (CompanionPawn->JumpMaxCount >= 2)
+	{
+		for (int32 Sample = 2; Sample <= 8; ++Sample)
+		{
+			if (TryPlan((JumpSpeed / Gravity) * (static_cast<float>(Sample) / 8.0f))) return true;
+		}
 	}
-	return true;
+	return false;
 }
 
 void ACompanionJumpNavLink::HandleSmartLinkReached(AActor* Agent, const FVector& Destination)
@@ -153,7 +186,8 @@ void ACompanionJumpNavLink::HandleSmartLinkReached(AActor* Agent, const FVector&
 	FVector Velocity;
 	FVector LandingPoint;
 	FString FailureReason;
-	if (!BuildJumpPlan(CompanionPawn, Destination, Velocity, LandingPoint, FailureReason))
+	float SecondJumpTime = -1.0f;
+	if (!BuildJumpPlan(CompanionPawn, Destination, Velocity, LandingPoint, FailureReason, &SecondJumpTime))
 	{
 		WarnRejected(FailureReason);
 		AI->StopMovement();
@@ -165,6 +199,7 @@ void ACompanionJumpNavLink::HandleSmartLinkReached(AActor* Agent, const FVector&
 	State.RequestId = Path->GetCurrentRequestId();
 	State.LandingPoint = LandingPoint;
 	State.bDrop = Velocity.IsNearlyZero();
+	State.SecondJumpTime = SecondJumpTime;
 	State.AirControl = Movement->AirControl;
 	State.FallingFriction = Movement->FallingLateralFriction;
 	State.FallingBraking = Movement->BrakingDecelerationFalling;
@@ -174,7 +209,12 @@ void ACompanionJumpNavLink::HandleSmartLinkReached(AActor* Agent, const FVector&
 	Movement->FallingLateralFriction = 0.0f;
 	Movement->BrakingDecelerationFalling = 0.0f;
 	CompanionPawn->StopJumping();
-	if (!State.bDrop) CompanionPawn->LaunchCharacter(Velocity, true, true);
+	if (!State.bDrop)
+	{
+		CompanionPawn->LaunchCharacter(Velocity, true, true);
+		// LaunchCharacter bypasses CheckJumpInput: account for this first jump.
+		CompanionPawn->JumpCurrentCount = 1;
+	}
 	SetActorTickEnabled(true);
 }
 
@@ -230,6 +270,35 @@ void ACompanionJumpNavLink::Tick(float DeltaSeconds)
 		}
 		State.Elapsed += DeltaSeconds;
 		UCharacterMovementComponent* Movement = Pawn->GetCharacterMovement();
+		if (State.Elapsed >= FMath::Max(TraversalTimeout, 1.0f))
+		{
+			WarnRejected(TEXT("the traversal timed out"));
+			Failed.Add(Entry.Key);
+			continue;
+		}
+		if (State.SecondJumpTime >= 0.0f && !State.bSecondJumpUsed
+			&& Movement->IsFalling() && State.Elapsed >= State.SecondJumpTime)
+		{
+			// Native DoJump checks the character's remaining jump allowance and sets
+			// upward speed; it does not add another impulse every frame.
+			bool bJumped = false;
+			if (Pawn->JumpMaxCount >= 2)
+			{
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
+				bJumped = Movement->DoJump(false);
+#else
+				bJumped = Movement->DoJump(false, DeltaSeconds);
+#endif
+			}
+			if (!bJumped)
+			{
+				WarnRejected(TEXT("the planned second jump is no longer available"));
+				Failed.Add(Entry.Key);
+				continue;
+			}
+			++Pawn->JumpCurrentCount;
+			State.bSecondJumpUsed = true;
+		}
 		if (State.bDrop && !State.bWasFalling)
 		{
 			const FVector Delta = State.LandingPoint - Movement->GetActorFeetLocation();
@@ -262,11 +331,6 @@ void ACompanionJumpNavLink::Tick(float DeltaSeconds)
 				WarnRejected(TEXT("the character landed outside the landing tolerance"));
 				Failed.Add(Entry.Key);
 			}
-		}
-		else if (State.Elapsed >= FMath::Max(TraversalTimeout, 1.0f))
-		{
-			WarnRejected(TEXT("the traversal timed out"));
-			Failed.Add(Entry.Key);
 		}
 	}
 	for (const auto& Pawn : Finished) FinishTraversal(Pawn, true);

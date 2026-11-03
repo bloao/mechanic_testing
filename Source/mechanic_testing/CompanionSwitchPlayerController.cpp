@@ -3,6 +3,7 @@
 #include "AIController.h"
 #include "CompanionCharacterBase.h"
 #include "CollisionQueryParams.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EngineUtils.h"
@@ -11,11 +12,16 @@
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "HAL/IConsoleManager.h"
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "NavigationSystem.h"
 #include "UObject/ConstructorHelpers.h"
+
+static TAutoConsoleVariable<int32> CVarCompanionFollowDebug(
+	TEXT("companion.Follow.Debug"), 0,
+	TEXT("Log follower route status and missing navigation connections (0/1)."));
 
 ACompanionSwitchPlayerController::ACompanionSwitchPlayerController()
 {
@@ -263,8 +269,14 @@ void ACompanionSwitchPlayerController::UpdateFollowerMove()
 	{
 		if (Path->GetStatus() == EPathFollowingStatus::Paused || Path->GetCurrentCustomLinkOb())
 		{
+			LogFollowStatus(TEXT("Traversal owns movement: waiting for the jump link to finish"));
 			return;
 		}
+		// Default reach checks allow about a capsule half-height of vertical error.
+		// Nearby platforms must not count as arrival before the AI takes their link.
+		const float HalfHeight = Follower->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		Path->SetPreciseReachThreshold(1.1f, FMath::Clamp(
+			Follower->GetCharacterMovement()->MaxStepHeight / FMath::Max(HalfHeight, 1.0f), 0.05f, 1.0f));
 	}
 
 	if (GroundTargetLeader.Get() != Leader)
@@ -308,13 +320,15 @@ void ACompanionSwitchPlayerController::UpdateFollowerMove()
 	// A failed trace/projection retains the last validated ground point, never an air target.
 	if (!bHasGroundFollowTarget || !IsValid(GroundFollowTarget))
 	{
+		LogFollowStatus(TEXT("No navigable ground target: check NavMesh on the player's platform and the ground trace"));
 		return;
 	}
-	const float DistanceSquared = FVector::DistSquared(
-		Follower->GetCharacterMovement()->GetActorFeetLocation(), GroundFollowTarget->GetActorLocation());
+	const FVector ToGoal = GroundFollowTarget->GetActorLocation() - Follower->GetCharacterMovement()->GetActorFeetLocation();
 	const float StopDistance = FMath::Max(FollowAcceptanceRadius, 1.0f);
-	if (DistanceSquared <= FMath::Square(StopDistance))
+	if (ToGoal.SizeSquared2D() <= FMath::Square(StopDistance)
+		&& FMath::Abs(ToGoal.Z) <= Follower->GetCharacterMovement()->MaxStepHeight)
 	{
+		LogFollowStatus(TEXT("Arrived: within follow distance on the same height"));
 		FollowerController->StopMovement();
 		return;
 	}
@@ -323,7 +337,28 @@ void ACompanionSwitchPlayerController::UpdateFollowerMove()
 	// including an in-progress navigation-link traversal.
 	if (FollowerController->GetMoveStatus() == EPathFollowingStatus::Idle)
 	{
-		FollowerController->MoveToActor(GroundFollowTarget, FollowAcceptanceRadius, true, true, true, nullptr, true);
+		const EPathFollowingRequestResult::Type Result = FollowerController->MoveToActor(
+			GroundFollowTarget, FollowAcceptanceRadius, true, true, true, nullptr, true);
+		if (Result == EPathFollowingRequestResult::Failed)
+		{
+			LogFollowStatus(TEXT("Move request failed: check NavMesh and a connected CompanionJumpNavLink between platforms"));
+		}
+		else if (const FNavPathSharedPtr Path = FollowerController->GetPathFollowingComponent()->GetPath())
+		{
+			LogFollowStatus(Path->IsPartial()
+				? TEXT("Partial route: the destination is disconnected; check both jump-link endpoints on NavMesh")
+				: TEXT("Following a route to the player's ground position"));
+		}
+	}
+}
+
+void ACompanionSwitchPlayerController::LogFollowStatus(const TCHAR* Status)
+{
+	if ((bLogCompanionSetup || CVarCompanionFollowDebug.GetValueOnGameThread())
+		&& GetWorld()->GetTimeSeconds() - LastFollowDebugTime >= 2.0)
+	{
+		LastFollowDebugTime = GetWorld()->GetTimeSeconds();
+		UE_LOG(LogTemp, Display, TEXT("Companion follow: %s"), Status);
 	}
 }
 

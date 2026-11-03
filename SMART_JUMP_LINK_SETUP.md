@@ -1,7 +1,7 @@
 # Companion Smart Jump Link (UE 5.6)
 
 `CompanionJumpNavLink` is a reusable native Smart Nav Link. It executes a normal
-character jump between its endpoints and resumes the existing follow request only
+character jump, or an agile double jump when needed, and resumes the follow request only
 after landing near the destination. It does not alter existing maps or links.
 
 ## Place One Test Link
@@ -33,8 +33,11 @@ merely placing them on a visible mesh does not guarantee navigation connectivity
 
 ## Jump Limits and Behaviour
 
-- The launch uses the character's existing Jump Z Velocity, Gravity Scale, capsule,
-  and Max Walk Speed. No extra jump strength or double jump is granted to the AI.
+- The launch uses the character's existing Jump Z Velocity, current world gravity,
+  Gravity Scale, capsule, and Max Walk Speed. It first tries a single jump. If that
+  cannot reach safely and the character has at least two allowed jumps, it checks
+  timed double-jump arcs and performs one second jump during ascent. Agile already
+  has this allowance; Strong keeps its single jump. No extra jump strength is given.
 - Destinations more than 5 cm below the character's feet use a walk-off and
   fall, with no upward launch. Place the lower endpoint close to the ledge: this
   does not grant extra horizontal reach or let the character cross a wide gap.
@@ -60,6 +63,17 @@ If no attempt or warning appears, first check the navigation connection and whet
 another route/link is being chosen. Debug drawing does not make a rejected link
 reachable. Do not increase character jump strength merely to bypass a blocked arc.
 
+Enter `companion.Follow.Debug 1` in the console to log follow status in Output Log
+(search for `Companion follow`). It distinguishes a missing navigable ground
+target, failed move request, partial/disconnected route, arrival, and movement owned
+by a jump link. Use `companion.Follow.Debug 0` to turn it off. A partial route still
+needs usable NavMesh and a connected jump link on both platforms; adding double
+jump does not generate new navigation connections.
+
+The follower now requires matching ground height (within its normal step height)
+before stopping inside the follow radius. Native path reach checks use the same
+vertical tolerance, preventing a nearby upper platform from counting as arrival.
+
 Test in UE 5.6: both characters, both directions, walking animation afterward,
 switching during the jump, an occupied landing area, low ceilings, blocked paths,
 and Stop/Play. Changing the map requires saving it on the university PC; the Mac's
@@ -72,9 +86,15 @@ the real UE 5.6 map, NavMesh connectivity, visuals, and runtime routing still ne
 the PC test above. Planning/traversal automation uses primitive test geometry and
 synthetic paths, not a baked copy of the blockout NavMesh.
 
-UnrealHeaderTool and the Development Editor build passed. All nine MechanicTesting
-automation tests passed with zero warnings or failures. The added tests exercise
+UnrealHeaderTool and the Development Editor compatibility build passed. All thirteen
+MechanicTesting automation tests passed with zero test warnings or failures. Tests exercise
 reachable jumps for both roles, physical traversal up and down, blocked and
 unreachable routes, landing/resuming, switching possession, timeout, and cleanup.
 Drop regression checks cover no upward velocity, repeated endpoint callbacks
 without another launch, and reverse traversal after arrival.
+The agile double-jump regression uses gravity -1200 at 30/60/120 Hz, checks that
+Strong cannot make that jump, verifies the second jump is used only when needed,
+and checks landing, restored movement settings, excessive distance, and a blocked
+ceiling. A follow regression checks that proximity on a lower platform does not
+stop the request or satisfy the native path-reach test. Baked NavMesh routing and
+Windows UE 5.6 still require the level test above.
