@@ -6,6 +6,10 @@ and breakable framework, and the wall-run automation tests. The 5.6 Content asse
 and map settings are retained unchanged; Mac 5.3 Blueprints were not copied over them.
 Adding C++ source does not automatically reparent or configure existing Blueprints.
 
+For the complete setup in **both gameplay levels**, use `MECHANICS_INTEGRATION.md`.
+Runtime startup now selects the complete GameMode for both maps; no Blueprint
+reparenting or map resave is required.
+
 ## Windows Build
 
 1. Use Unreal Engine 5.6, not 5.3 or 5.4. If asked to choose an engine, select the
@@ -33,7 +37,7 @@ Adding C++ source does not automatically reparent or configure existing Blueprin
 
    ```powershell
    $ProjectFile = Join-Path (Get-Location).Path "mechanic_testing.uproject"
-   & "C:\Program Files\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat" mechanic_testingEditor Win64 Development "-Project=$ProjectFile" -WaitMutex -NoEngineChanges -NoHotReloadFromIDE
+   & "C:\Program Files\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat" mechanic_testingEditor Win64 Development "-Project=$ProjectFile" -WaitMutex -NoEngineChanges -NoHotReloadFromIDE -NoUBA -NoUBALocal
    ```
 
 The university's MSVC 14.51 and SDK were detected, and a local-drive build reached
@@ -47,9 +51,9 @@ setup must be rebuilt and tested on the PC; that newer change is not yet verifie
 
 Use `TWO_CHARACTERS_SETUP.md` for the native pair setup:
 
-1. Open `/Game/ThirdPerson/Lvl_ThirdPerson` and set **World Settings > GameMode Override**
-   to **CompanionGameMode**. Save the map in 5.6. The old per-map Blueprint override
-   otherwise takes precedence over the new project default.
+1. Open `/Game/ThirdPerson/Lvl_ThirdPerson` or `/Game/ThirdPerson/LVL_level2`.
+   The shared GameInstance selects the companion GameMode in both levels,
+   including when a legacy map override is saved. Map assets need no changes.
 2. Keep PlayerStart on clear floor and add/retain a Nav Mesh Bounds Volume.
 3. Press Play. The GameMode spawns Agile (Quinn) and Strong (Manny), assigns abilities
    and AI controllers, and preserves the existing Tab switch/follow logic.

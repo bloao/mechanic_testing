@@ -3,6 +3,8 @@
 #include "mechanic_testing/CompanionCharacterBase.h"
 #include "mechanic_testing/CompanionCharacterMovementComponent.h"
 #include "mechanic_testing/CompanionGameMode.h"
+#include "mechanic_testing/CompanionGameInstance.h"
+#include "mechanic_testing/CompanionPlayableCharacter.h"
 #include "mechanic_testing/CompanionJumpNavLink.h"
 #include "mechanic_testing/CompanionSwitchPlayerController.h"
 #include "mechanic_testing/BreakableActor.h"
@@ -21,6 +23,8 @@
 #include "Misc/EngineVersionComparison.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "NavigationData.h"
+#include "NavigationSystem.h"
+#include "NavMesh/NavMeshBoundsVolume.h"
 #include "NavLinkCustomComponent.h"
 
 namespace CompanionWallRunTests
@@ -61,7 +65,7 @@ namespace CompanionWallRunTests
 			World->DestroyWorld(false);
 		}
 
-		UBoxComponent* AddBox(const FVector& Location, const FVector& Extent, AActor* ExistingActor = nullptr)
+		UBoxComponent* AddBox(const FVector& Location, const FVector& Extent, AActor* ExistingActor = nullptr, ECollisionChannel ObjectType = ECC_WorldStatic)
 		{
 			AActor* Actor = ExistingActor ? ExistingActor : World->SpawnActor<AActor>();
 			UBoxComponent* Box = NewObject<UBoxComponent>(Actor);
@@ -69,9 +73,9 @@ namespace CompanionWallRunTests
 			else Actor->SetRootComponent(Box);
 			Box->InitBoxExtent(Extent);
 			Box->SetWorldLocation(Location);
-			Box->SetMobility(EComponentMobility::Static);
+			Box->SetMobility(ObjectType == ECC_WorldStatic ? EComponentMobility::Static : EComponentMobility::Movable);
 			Box->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-			Box->SetCollisionObjectType(ECC_WorldStatic);
+			Box->SetCollisionObjectType(ObjectType);
 			Box->SetCollisionResponseToAllChannels(ECR_Block);
 			Box->RegisterComponent();
 			return Box;
@@ -218,36 +222,39 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionWallRunChainTest,
 bool FCompanionWallRunChainTest::RunTest(const FString& Parameters)
 {
 	using namespace CompanionWallRunTests;
-	for (float InitialSide : {1.0f, -1.0f})
+	for (ECollisionChannel WallType : {ECC_WorldStatic, ECC_WorldDynamic})
 	{
-		FTestWorld TestWorld(0.0f);
-		// Also cover a diagonal launch too steep for velocity-relative side traces.
-		if (InitialSide < 0.0f) TestWorld.Movement->WallJumpAwaySpeed = 1000.0f;
-		// Both corridor faces belong to one actor: actor-based exclusion would fail.
-		UBoxComponent* FirstWall = TestWorld.AddBox(FVector(0.0, InitialSide * 75.0, 5000.0), FVector(30000.0, 10.0, 5000.0));
-		TestWorld.AddBox(FVector(0.0, -InitialSide * 275.0, 5000.0), FVector(30000.0, 10.0, 5000.0), FirstWall->GetOwner());
-		TestWorld.Step();
-		if (!TestTrue(TEXT("Initial wall run starts"), TestWorld.Movement->IsWallRunning())) return false;
-		for (int32 Transfer = 0; Transfer < 12; ++Transfer)
+		for (float InitialSide : {1.0f, -1.0f})
 		{
-			const bool bPreviousRight = TestWorld.Movement->IsWallOnRight();
-			// Spend most of the run allowance before each jump to exercise its refresh.
-			for (int32 Frame = 0; Frame < 60; ++Frame) TestWorld.Step();
-			if (!TestTrue(TEXT("Each catch grants a fresh run duration"), TestWorld.Movement->IsWallRunning())) return false;
-			const double BeforeX = TestWorld.Character->GetActorLocation().X;
-			TestWorld.Character->StopJumping();
-			TestWorld.Character->Jump();
-			TestFalse(TEXT("Jump leaves the current wall"), TestWorld.Movement->IsWallRunning());
-			TestTrue(TEXT("Vertical boost is set, not accumulated"), FMath::IsNearlyEqual(TestWorld.Movement->Velocity.Z, static_cast<double>(TestWorld.Movement->WallJumpUpSpeed)));
+			FTestWorld TestWorld(0.0f);
+			// Also cover a diagonal launch too steep for velocity-relative side traces.
+			if (InitialSide < 0.0f) TestWorld.Movement->WallJumpAwaySpeed = 1000.0f;
+			// Both corridor faces belong to one actor: actor-based exclusion would fail.
+			UBoxComponent* FirstWall = TestWorld.AddBox(FVector(0.0, InitialSide * 75.0, 5000.0), FVector(30000.0, 10.0, 5000.0), nullptr, WallType);
+			TestWorld.AddBox(FVector(0.0, -InitialSide * 275.0, 5000.0), FVector(30000.0, 10.0, 5000.0), FirstWall->GetOwner(), WallType);
 			TestWorld.Step();
-			TestFalse(TEXT("Cannot immediately reattach to the departure wall"), TestWorld.Movement->IsWallRunning());
-			TestTrue(TEXT("Forward launch momentum survives falling physics"), TestWorld.Movement->Velocity.X >= TestWorld.Movement->WallRunSpeed - 1.0f);
-			TestTrue(TEXT("Sideways launch momentum survives falling physics"), FMath::Abs(TestWorld.Movement->Velocity.Y) >= TestWorld.Movement->WallJumpAwaySpeed - 1.0f);
-			for (int32 Frame = 0; Frame < 75 && !TestWorld.Movement->IsWallRunning(); ++Frame) TestWorld.Step();
-			if (!TestTrue(TEXT("Opposite wall is caught without landing"), TestWorld.Movement->IsWallRunning())) return false;
-			TestTrue(TEXT("The wall side alternates on every catch"), TestWorld.Movement->IsWallOnRight() != bPreviousRight);
-			TestTrue(TEXT("Transfer continues forward down the corridor"), TestWorld.Character->GetActorLocation().X > BeforeX);
-			TestTrue(TEXT("Chain stays airborne"), TestWorld.Movement->IsFalling());
+			if (!TestTrue(TEXT("Initial wall run starts"), TestWorld.Movement->IsWallRunning())) return false;
+			for (int32 Transfer = 0; Transfer < 12; ++Transfer)
+			{
+				const bool bPreviousRight = TestWorld.Movement->IsWallOnRight();
+				// Spend most of the run allowance before each jump to exercise its refresh.
+				for (int32 Frame = 0; Frame < 60; ++Frame) TestWorld.Step();
+				if (!TestTrue(TEXT("Each catch grants a fresh run duration"), TestWorld.Movement->IsWallRunning())) return false;
+				const double BeforeX = TestWorld.Character->GetActorLocation().X;
+				TestWorld.Character->StopJumping();
+				TestWorld.Character->Jump();
+				TestFalse(TEXT("Jump leaves the current wall"), TestWorld.Movement->IsWallRunning());
+				TestTrue(TEXT("Vertical boost is set, not accumulated"), FMath::IsNearlyEqual(TestWorld.Movement->Velocity.Z, static_cast<double>(TestWorld.Movement->WallJumpUpSpeed)));
+				TestWorld.Step();
+				TestFalse(TEXT("Cannot immediately reattach to the departure wall"), TestWorld.Movement->IsWallRunning());
+				TestTrue(TEXT("Forward launch momentum survives falling physics"), TestWorld.Movement->Velocity.X >= TestWorld.Movement->WallRunSpeed - 1.0f);
+				TestTrue(TEXT("Sideways launch momentum survives falling physics"), FMath::Abs(TestWorld.Movement->Velocity.Y) >= TestWorld.Movement->WallJumpAwaySpeed - 1.0f);
+				for (int32 Frame = 0; Frame < 75 && !TestWorld.Movement->IsWallRunning(); ++Frame) TestWorld.Step();
+				if (!TestTrue(TEXT("Opposite wall is caught without landing"), TestWorld.Movement->IsWallRunning())) return false;
+				TestTrue(TEXT("The wall side alternates on every catch"), TestWorld.Movement->IsWallOnRight() != bPreviousRight);
+				TestTrue(TEXT("Transfer continues forward down the corridor"), TestWorld.Character->GetActorLocation().X > BeforeX);
+				TestTrue(TEXT("Chain stays airborne"), TestWorld.Movement->IsFalling());
+			}
 		}
 	}
 	return true;
@@ -414,8 +421,10 @@ bool FCompanionPairNoFloorTest::RunTest(const FString& Parameters)
 	ACompanionGameMode* Mode = TestWorld.World->SpawnActor<ACompanionGameMode>();
 	Mode->StrongCompanionClass = ACompanionCharacterBase::StaticClass();
 	AddExpectedMessage(TEXT("Could not spawn Strong:"), ELogVerbosity::Warning);
+	TestWorld.Movement->SetWallRunEnabled(false);
 	TestFalse(TEXT("No floor causes a safe spawn failure"), Mode->SetupCompanionPair(CompanionController));
 	TestNull(TEXT("No companion spawned over empty space"), Mode->StrongCompanion.Get());
+	TestTrue(TEXT("A failed companion spawn does not disable Agile's wall running"), TestWorld.Movement->bCanWallRun);
 	return true;
 }
 
@@ -792,6 +801,89 @@ bool FCompanionJumpAttemptTest::RunTest(const FString& Parameters)
 		TestWorld.Player->Possess(TestWorld.Character);
 		Link->Tick(1.0f);
 		TestTrue(TEXT("Switching characters cancels the attempt"), Link->Traversals.IsEmpty());
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionLevelIntegrationTest,
+	"MechanicTesting.Integration.GameplayLevels", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionLevelIntegrationTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	FTestWorld TestWorld(0.0f);
+	UCompanionGameInstance* Instance = NewObject<UCompanionGameInstance>();
+	TestWorld.World->GetWorldSettings()->DefaultGameMode = AGameModeBase::StaticClass();
+	for (const TCHAR* MapName : {TEXT("/Game/ThirdPerson/Lvl_ThirdPerson"), TEXT("/Game/ThirdPerson/LVL_level2"),
+		TEXT("/Game/ThirdPerson/UEDPIE_0_Lvl_ThirdPerson"), TEXT("/Game/ThirdPerson/UEDPIE_3_LVL_level2")})
+	{
+		const FURL URL(nullptr, MapName, TRAVEL_Absolute);
+		AGameModeBase* SelectedMode = Instance->CreateGameModeForURL(URL, TestWorld.World);
+		TestNotNull(TEXT("Each gameplay level resolves a GameMode"), SelectedMode);
+		if (!SelectedMode) return false;
+		TestTrue(TEXT("Both levels override a saved legacy GameMode with the complete setup"), SelectedMode->IsA<ACompanionGameMode>());
+		TestEqual(TEXT("Both levels use the native playable character"), SelectedMode->DefaultPawnClass.Get(), ACompanionPlayableCharacter::StaticClass());
+		TestEqual(TEXT("Both levels use the companion switching controller"), SelectedMode->PlayerControllerClass.Get(), ACompanionSwitchPlayerController::StaticClass());
+		SelectedMode->Destroy();
+	}
+	TestEqual(TEXT("Other maps retain their selected GameMode"), Instance->OverrideGameModeClass(
+		AGameModeBase::StaticClass(), TEXT("/Game/Other/TestMap"), TEXT(""), TEXT("")).Get(), AGameModeBase::StaticClass());
+	ACompanionPlayableCharacter* Defaults = GetMutableDefault<ACompanionPlayableCharacter>();
+	TestTrue(TEXT("Native player always has the custom movement component"), Defaults->GetCharacterMovement()->IsA<UCompanionCharacterMovementComponent>());
+
+	ACompanionGameMode* Mode = TestWorld.World->SpawnActor<ACompanionGameMode>();
+	TestWorld.Character->AutoPossessPlayer = EAutoReceiveInput::Player0;
+	const FTransform OriginalPawnTransform = TestWorld.Character->GetActorTransform();
+	Mode->PreparePlacedPlayerPawns();
+	TestTrue(TEXT("A legacy placed player cannot steal auto-possession"), TestWorld.Character->AutoPossessPlayer == EAutoReceiveInput::Disabled);
+	TestTrue(TEXT("Preparing players preserves authored transforms and visibility"), TestWorld.Character->GetActorTransform().Equals(OriginalPawnTransform) && !TestWorld.Character->IsHidden());
+
+	UBoxComponent* AuthoredFloor = TestWorld.AddBox(FVector(10000.0, 0.0, -50.0), FVector(150.0, 150.0, 50.0), nullptr, ECC_WorldDynamic);
+	const FTransform OriginalFloorTransform = AuthoredFloor->GetComponentTransform();
+	const FName OriginalProfile = AuthoredFloor->GetCollisionProfileName();
+	ANavMeshBoundsVolume* Bounds = Mode->EnsureNavigationBounds();
+	if (!TestNotNull(TEXT("A level without authored coverage receives runtime bounds"), Bounds)) return false;
+	TestTrue(TEXT("Generated bounds are transient"), Bounds->HasAnyFlags(RF_Transient));
+	TestTrue(TEXT("Runtime bounds cover authored floor geometry"), Bounds->GetComponentsBoundingBox(true).IsInside(AuthoredFloor->Bounds.GetBox()));
+	TestEqual(TEXT("Existing navigation bounds are reused"), Mode->EnsureNavigationBounds(), Bounds);
+	TestTrue(TEXT("Navigation setup preserves physical transforms and collision"), AuthoredFloor->GetComponentTransform().Equals(OriginalFloorTransform)
+		&& AuthoredFloor->GetCollisionProfileName() == OriginalProfile);
+	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(TestWorld.World);
+	if (!TestNotNull(TEXT("The navigation system is available"), Navigation)) return false;
+	Navigation->Tick(1.0f / 60.0f);
+	ANavigationData* Data = Navigation->GetDefaultNavDataInstance(FNavigationSystem::Create);
+	if (!TestNotNull(TEXT("Runtime coverage creates navigation data"), Data)) return false;
+	Data->RebuildAll();
+	Data->EnsureBuildCompletion();
+	FNavLocation Projected;
+	TestTrue(TEXT("The generated NavMesh has a walkable floor"), Navigation->ProjectPointToNavigation(FVector(1000.0, 0.0, 0.0), Projected, FVector(100.0, 100.0, 200.0)));
+
+	// A small starting platform has no floor at the old four 250-cm offsets.
+	TestWorld.Character->SetActorLocation(FVector(10000.0, 0.0, 90.0));
+	TestWorld.Player->UnPossess();
+	ACompanionSwitchPlayerController* Controller = TestWorld.World->SpawnActor<ACompanionSwitchPlayerController>();
+	Controller->Possess(TestWorld.Character);
+	Mode->StrongCompanionClass = ACompanionCharacterBase::StaticClass();
+	TestTrue(TEXT("The companion pair can spawn on a small Blueprint-style platform"), Mode->SetupCompanionPair(Controller));
+	TestTrue(TEXT("Agile's wall-run ability is enabled after level setup"), TestWorld.Movement->bCanWallRun);
+	TestTrue(TEXT("Spawning also preserves the authored floor"), AuthoredFloor->GetComponentTransform().Equals(OriginalFloorTransform));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionWallRunWorldGeometryTest,
+	"MechanicTesting.WallRun.BlueprintGeometry", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionWallRunWorldGeometryTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	for (bool bPhysicsWall : {false, true})
+	{
+		FTestWorld TestWorld(0.0f);
+		UBoxComponent* Wall = TestWorld.AddBox(FVector(0.0, 75.0, 1000.0), FVector(5000.0, 10.0, 1000.0), nullptr, ECC_WorldDynamic);
+		Wall->SetSimulatePhysics(bPhysicsWall);
+		TestWorld.Step();
+		TestEqual(TEXT("Stationary Blueprint walls are supported while physics bodies are excluded"), TestWorld.Movement->IsWallRunning(), !bPhysicsWall);
+		TestTrue(TEXT("Detection does not change the authored wall object type"), Wall->GetCollisionObjectType() == ECC_WorldDynamic);
 	}
 	return true;
 }

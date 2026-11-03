@@ -54,7 +54,7 @@ FString UCompanionCharacterMovementComponent::GetWallRunDebugStatus() const
 	}
 	if (bWallTransferActive && !bFoundWall) return TEXT("Transferring: waiting for an opposing wall");
 	return bFoundWall ? TEXT("Wall detected: move along it, not into it")
-		: TEXT("No valid side wall: check distance, wall height and WorldStatic/Pawn collision");
+		: TEXT("No stationary side wall: check distance, height and Pawn-blocking collision");
 }
 
 void UCompanionCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -154,10 +154,17 @@ bool UCompanionCharacterMovementComponent::FindWall(const FVector& Direction, FH
 	const float Reach = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius() + WallDetectionDistance;
 	const FVector Start = UpdatedComponent->GetComponentLocation();
 	const FCollisionQueryParams Query(SCENE_QUERY_STAT(CompanionWallRun), false, CharacterOwner);
-	const FCollisionObjectQueryParams Objects(ECC_WorldStatic);
+	FCollisionObjectQueryParams Objects;
+	Objects.AddObjectTypesToQuery(ECC_WorldStatic);
+	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
 	return GetWorld()->LineTraceSingleByObjectType(Hit, Start, Start + Direction * Reach, Objects, Query)
 		&& Hit.bBlockingHit
+		&& Hit.GetComponent()
 		&& Hit.GetComponent()->GetCollisionResponseToChannel(ECC_Pawn) == ECR_Block
+		// Blueprint blockout walls often use WorldDynamic despite being stationary.
+		// Support those without changing their collision profiles or mobility.
+		&& !Hit.GetComponent()->IsSimulatingPhysics()
+		&& Hit.GetComponent()->GetComponentVelocity().IsNearlyZero(1.0f)
 		&& FMath::Abs(Hit.ImpactNormal.Z) <= 0.2f;
 }
 

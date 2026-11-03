@@ -2,6 +2,7 @@
 
 #include "AIController.h"
 #include "CompanionCharacterBase.h"
+#include "CompanionGameMode.h"
 #include "CollisionQueryParams.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/PrimitiveComponent.h"
@@ -49,7 +50,12 @@ void ACompanionSwitchPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	InitializeCompanions();
+	// The native GameMode owns spawning and explicit role assignment. Discovering
+	// placed template pawns here can replace that pair during level startup.
+	if (!GetWorld()->GetAuthGameMode<ACompanionGameMode>())
+	{
+		InitializeCompanions();
+	}
 
 	if (DefaultInputMappingContext)
 	{
