@@ -31,17 +31,18 @@ FString UCompanionCharacterMovementComponent::GetWallRunDebugStatus() const
 	if (bWallRunning) return TEXT("RUNNING");
 	if (!bCanWallRun) return TEXT("Disabled: this character has not been given wall running");
 	if (!IsFalling()) return TEXT("Grounded: jump while moving alongside the wall");
-	if (bWallRunUsedThisAirborne) return TEXT("Already used: land before trying again");
+	if (bWallRunUsedThisAirborne && !bWallTransferActive) return TEXT("Run ended: land to reset, or jump off while running to transfer");
 	if (Acceleration.IsNearlyZero()) return TEXT("No movement input");
 	if (Velocity.SizeSquared2D() < FMath::Square(MinWallRunSpeed)) return TEXT("Below minimum horizontal speed");
 
-	const FVector TravelDirection = Velocity.GetSafeNormal2D();
+	const FVector TravelDirection = GetWallSearchDirection();
 	const FVector SideDirection = FVector::CrossProduct(FVector::UpVector, TravelDirection);
 	bool bFoundWall = false;
 	for (float Side : {1.0f, -1.0f})
 	{
 		FHitResult Hit;
 		if (!FindWall(SideDirection * Side, Hit)) continue;
+		if (!CanCatchWall(Hit.ImpactNormal.GetSafeNormal2D())) continue;
 		bFoundWall = true;
 		FVector AlongWall = FVector::CrossProduct(Hit.ImpactNormal.GetSafeNormal2D(), FVector::UpVector);
 		if (FVector::DotProduct(AlongWall, TravelDirection) < 0.0f) AlongWall *= -1.0f;
@@ -51,6 +52,7 @@ FString UCompanionCharacterMovementComponent::GetWallRunDebugStatus() const
 			return TEXT("Ready: valid side wall detected");
 		}
 	}
+	if (bWallTransferActive && !bFoundWall) return TEXT("Transferring: waiting for an opposing wall");
 	return bFoundWall ? TEXT("Wall detected: move along it, not into it")
 		: TEXT("No valid side wall: check distance, wall height and WorldStatic/Pawn collision");
 }
@@ -75,7 +77,7 @@ void UCompanionCharacterMovementComponent::TickComponent(float DeltaTime, ELevel
 			FString::Printf(TEXT("WallRun [%s]: %s | Speed %.0f | Reach %.0f cm"),
 				*CharacterOwner->GetName(), *Status, Velocity.Size2D(), WallDetectionDistance));
 	}
-	const FVector TravelDirection = Velocity.IsNearlyZero() ? CharacterOwner->GetActorForwardVector() : Velocity.GetSafeNormal2D();
+	const FVector TravelDirection = Velocity.IsNearlyZero() ? CharacterOwner->GetActorForwardVector() : GetWallSearchDirection();
 	const FVector SideDirection = FVector::CrossProduct(FVector::UpVector, TravelDirection);
 	const FVector Start = UpdatedComponent->GetComponentLocation();
 	const float Reach = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius() + WallDetectionDistance;
@@ -100,6 +102,8 @@ void UCompanionCharacterMovementComponent::SetWallRunEnabled(bool bEnabled)
 void UCompanionCharacterMovementComponent::StopWallRun()
 {
 	bWallRunning = false;
+	bWallTransferActive = false;
+	WallTransferTimeRemaining = 0.0f;
 }
 
 bool UCompanionCharacterMovementComponent::IsWallOnRight() const
@@ -116,14 +120,20 @@ bool UCompanionCharacterMovementComponent::JumpOffWall()
 	}
 
 	StopWallRun();
+	// Keep the last wall normal and forward direction until the next catch. Opposing
+	// surfaces can belong to the same actor/component, so actor identity is not used.
+	bWallTransferActive = WallTransferDuration > 0.0f;
+	WallTransferTimeRemaining = WallTransferDuration;
 	Velocity = WallRunDirection * WallRunSpeed + WallNormal * WallJumpAwaySpeed;
-	Velocity.Z = JumpZVelocity;
+	Velocity.Z = WallJumpUpSpeed;
 	return true;
 }
 
 float UCompanionCharacterMovementComponent::GetMaxSpeed() const
 {
-	return bWallRunning ? WallRunSpeed : Super::GetMaxSpeed();
+	if (bWallRunning) return WallRunSpeed;
+	// Walking's speed cap must not erase the combined forward/sideways launch.
+	return bWallTransferActive ? FMath::Max(WallRunSpeed, static_cast<float>(Velocity.Size2D())) : Super::GetMaxSpeed();
 }
 
 void UCompanionCharacterMovementComponent::OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode)
@@ -161,15 +171,30 @@ bool UCompanionCharacterMovementComponent::HasPlayerControl() const
 	return CharacterOwner && Cast<APlayerController>(CharacterOwner->GetController()) != nullptr;
 }
 
+FVector UCompanionCharacterMovementComponent::GetWallSearchDirection() const
+{
+	// The launch is diagonal across the corridor. Search beside the original
+	// forward direction so even a strong sideways push can catch the next wall.
+	return bWallTransferActive ? WallRunDirection : Velocity.GetSafeNormal2D();
+}
+
+bool UCompanionCharacterMovementComponent::CanCatchWall(const FVector& Normal) const
+{
+	// Only a deliberate jump can refresh a used run, and only on an opposing face.
+	// The wall just left remains ineligible throughout the transfer.
+	return !bWallRunUsedThisAirborne
+		|| (bWallTransferActive && FVector::DotProduct(Normal, WallNormal) <= -0.7f);
+}
+
 void UCompanionCharacterMovementComponent::TryStartWallRun()
 {
-	if (!bCanWallRun || bWallRunUsedThisAirborne || !HasPlayerControl()
+	if (!bCanWallRun || (bWallRunUsedThisAirborne && !bWallTransferActive) || !HasPlayerControl()
 		|| Acceleration.IsNearlyZero() || Velocity.SizeSquared2D() < FMath::Square(MinWallRunSpeed))
 	{
 		return;
 	}
 
-	const FVector TravelDirection = Velocity.GetSafeNormal2D();
+	const FVector TravelDirection = GetWallSearchDirection();
 	const FVector SideDirection = FVector::CrossProduct(FVector::UpVector, TravelDirection);
 	for (float Side : {1.0f, -1.0f})
 	{
@@ -179,17 +204,23 @@ void UCompanionCharacterMovementComponent::TryStartWallRun()
 			continue;
 		}
 
-		WallNormal = Hit.ImpactNormal.GetSafeNormal2D();
-		WallRunDirection = FVector::CrossProduct(WallNormal, FVector::UpVector);
-		if (FVector::DotProduct(WallRunDirection, TravelDirection) < 0.0f)
+		const FVector CandidateNormal = Hit.ImpactNormal.GetSafeNormal2D();
+		if (!CanCatchWall(CandidateNormal)) continue;
+		FVector CandidateDirection = FVector::CrossProduct(CandidateNormal, FVector::UpVector);
+		if (FVector::DotProduct(CandidateDirection, TravelDirection) < 0.0f)
 		{
-			WallRunDirection *= -1.0f;
+			CandidateDirection *= -1.0f;
 		}
-		if (FVector::DotProduct(WallRunDirection, TravelDirection) < 0.7f || !HasWallRunInput())
+		if (FVector::DotProduct(CandidateDirection, TravelDirection) < 0.7f
+			|| FVector::DotProduct(Acceleration.GetSafeNormal2D(), CandidateDirection) <= 0.1f)
 		{
 			continue;
 		}
 
+		WallNormal = CandidateNormal;
+		WallRunDirection = CandidateDirection;
+		bWallTransferActive = false;
+		WallTransferTimeRemaining = 0.0f;
 		bWallRunning = true;
 		bWallRunUsedThisAirborne = true;
 		WallRunElapsed = 0.0f;
@@ -203,6 +234,14 @@ void UCompanionCharacterMovementComponent::PhysFalling(float DeltaTime, int32 It
 	if (!HasValidData())
 	{
 		return;
+	}
+	if (bWallTransferActive)
+	{
+		WallTransferTimeRemaining -= DeltaTime;
+		if (!bCanWallRun || !HasPlayerControl() || !HasWallRunInput() || WallTransferTimeRemaining <= 0.0f)
+		{
+			StopWallRun();
+		}
 	}
 
 	if (bWallRunning)
@@ -222,7 +261,19 @@ void UCompanionCharacterMovementComponent::PhysFalling(float DeltaTime, int32 It
 
 	if (!bWallRunning)
 	{
-		Super::PhysFalling(DeltaTime, Iterations);
+		if (bWallTransferActive)
+		{
+			// Preserve the jump's horizontal trajectory while native physics handles
+			// full gravity, capsule collisions and landing. No launch is added per tick.
+			TGuardValue<float> FrictionGuard(FallingLateralFriction, 0.0f);
+			TGuardValue<float> BrakingGuard(BrakingDecelerationFalling, 0.0f);
+			TGuardValue<FVector> AccelerationGuard(Acceleration, FVector::ZeroVector);
+			Super::PhysFalling(DeltaTime, Iterations);
+		}
+		else
+		{
+			Super::PhysFalling(DeltaTime, Iterations);
+		}
 		return;
 	}
 

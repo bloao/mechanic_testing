@@ -50,17 +50,27 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Abilities|Wall Run", meta = (ClampMin = "0.0", ToolTip = "Jump-away speed in centimeters per second."))
 	float WallJumpAwaySpeed = 450.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Abilities|Wall Run", meta = (ClampMin = "0.0", ToolTip = "Vertical speed set on each wall jump, rather than added to existing velocity. Centimeters per second."))
+	float WallJumpUpSpeed = 500.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Abilities|Wall Run", meta = (ClampMin = "0.0", Units = "s", ToolTip = "Time after a wall jump in which an opposing wall can refresh the wall run. Forward and sideways momentum are preserved during this transfer."))
+	float WallTransferDuration = 1.2f;
+
 protected:
 	virtual void PhysFalling(float DeltaTime, int32 Iterations) override;
 
 private:
 	bool bWallRunning = false;
 	bool bWallRunUsedThisAirborne = false;
+	bool bWallTransferActive = false;
+	float WallTransferTimeRemaining = 0.0f;
 	float WallRunElapsed = 0.0f;
 	FVector WallNormal = FVector::ZeroVector;
 	FVector WallRunDirection = FVector::ZeroVector;
 
 	bool FindWall(const FVector& Direction, FHitResult& Hit) const;
+	FVector GetWallSearchDirection() const;
+	bool CanCatchWall(const FVector& Normal) const;
 	bool HasWallRunInput() const;
 	bool HasPlayerControl() const;
 	void TryStartWallRun();
