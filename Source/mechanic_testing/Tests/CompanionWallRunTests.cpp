@@ -723,4 +723,54 @@ bool FCompanionDoubleJumpTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionJumpAttemptTest,
+	"MechanicTesting.Companions.AttemptUnreachableJumps", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionJumpAttemptTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	AddExpectedMessage(TEXT("above this character's available jump height"), ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 2);
+	for (bool bAgile : {false, true})
+	{
+		FTestWorld TestWorld(0.0f);
+		TestWorld.Player->UnPossess();
+		AAIController* AI = TestWorld.World->SpawnActor<AAIController>();
+		AI->Possess(TestWorld.Character);
+		TestWorld.Character->ConfigureAgileAbilities(bAgile);
+		TestWorld.Movement->JumpZVelocity = 700.0f;
+		TestWorld.Movement->MaxWalkSpeed = 500.0f;
+		TestWorld.Character->SetActorLocation(FVector(0.0, 0.0, 90.0));
+		TestWorld.Movement->SetMovementMode(MOVE_Walking);
+		TestWorld.Movement->Velocity = FVector::ZeroVector;
+		TestWorld.AddBox(FVector(500.0, 0.0, 350.0), FVector(150.0, 300.0, 350.0));
+		const FVector Destination(500.0, 0.0, 700.0);
+		ACompanionJumpNavLink* Link = TestWorld.World->SpawnActor<ACompanionJumpNavLink>();
+		Link->DispatchBeginPlay();
+		const auto RequestJump = [&]()
+		{
+			FAIMoveRequest Request(Destination);
+			Request.SetAcceptanceRadius(20.0f);
+			AI->RequestMove(Request, MakeShared<FNavigationPath, ESPMode::ThreadSafe>(
+				TArray<FVector>{TestWorld.Movement->GetActorFeetLocation(), Destination}));
+			Link->GetSmartLinkComp()->OnLinkMoveStarted(AI->GetPathFollowingComponent(), Destination);
+		};
+		Link->bAttemptUnreachableJumps = false;
+		RequestJump();
+		TestFalse(TEXT("Strict mode can still reject the impossible jump"), Link->Traversals.Contains(TestWorld.Character));
+		Link->bAttemptUnreachableJumps = true;
+		RequestJump();
+		if (!TestTrue(TEXT("Attempt mode launches even when no valid trajectory exists"), Link->Traversals.Contains(TestWorld.Character))) return false;
+		TestEqual(TEXT("Agile schedules another jump; Strong does not"), Link->Traversals[TestWorld.Character].SecondJumpTime > 0.0f, bAgile);
+		TestWorld.Step(false);
+		TestTrue(TEXT("The attempted jump actually leaves the ground"), TestWorld.Movement->IsFalling() && TestWorld.Movement->Velocity.Z > 0.0);
+		TestTrue(TEXT("Attempts keep the normal horizontal speed cap"), TestWorld.Movement->Velocity.Size2D() <= 501.0f);
+		// Taking control before a scheduled second jump must cancel link ownership.
+		AI->UnPossess();
+		TestWorld.Player->Possess(TestWorld.Character);
+		Link->Tick(1.0f);
+		TestTrue(TEXT("Switching characters cancels the attempt"), Link->Traversals.IsEmpty());
+	}
+	return true;
+}
+
 #endif

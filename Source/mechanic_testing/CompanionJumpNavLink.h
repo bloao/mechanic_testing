@@ -38,10 +38,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Jump Link")
 	bool bDrawJumpDebug = false;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Jump Link", meta = (ToolTip = "Attempt jumps even when predicted height, distance, or clearance checks fail. Uses normal jump strength and speed."))
+	bool bAttemptUnreachableJumps = true;
+
 private:
 	friend class FCompanionJumpPlanTest;
 	friend class FCompanionJumpTraversalTest;
 	friend class FCompanionDoubleJumpTest;
+	friend class FCompanionJumpAttemptTest;
 
 	struct FTraversal
 	{

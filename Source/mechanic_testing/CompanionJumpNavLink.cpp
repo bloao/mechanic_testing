@@ -176,8 +176,10 @@ void ACompanionJumpNavLink::HandleSmartLinkReached(AActor* Agent, const FVector&
 	// ResumeMove can select the just-completed custom segment again. Let normal
 	// path following advance past it instead of launching from the landing point.
 	UCharacterMovementComponent* Movement = CompanionPawn->GetCharacterMovement();
+	const FVector ToDestination = Destination - Movement->GetActorFeetLocation();
 	if (Movement->IsMovingOnGround()
-		&& FVector::Dist(Movement->GetActorFeetLocation(), Destination) <= FMath::Max(LandingTolerance, 10.0f))
+		&& ToDestination.Size2D() <= FMath::Max(LandingTolerance, 10.0f)
+		&& FMath::Abs(ToDestination.Z) <= Movement->MaxStepHeight)
 	{
 		ResumePathFollowing(CompanionPawn);
 		return;
@@ -189,9 +191,37 @@ void ACompanionJumpNavLink::HandleSmartLinkReached(AActor* Agent, const FVector&
 	float SecondJumpTime = -1.0f;
 	if (!BuildJumpPlan(CompanionPawn, Destination, Velocity, LandingPoint, FailureReason, &SecondJumpTime))
 	{
-		WarnRejected(FailureReason);
-		AI->StopMovement();
-		return;
+		if (!bAttemptUnreachableJumps || !Movement->IsMovingOnGround() || !CompanionPawn->CanJump())
+		{
+			WarnRejected(FailureReason);
+			AI->StopMovement();
+			return;
+		}
+		// Prototype mode: prediction is advisory. Aim toward the link endpoint with
+		// ordinary jump strength, even if the capsule arc is blocked or out of reach.
+		LandingPoint = Destination;
+		const float Gravity = -Movement->GetGravityZ();
+		const float JumpSpeed = Movement->JumpZVelocity;
+		SecondJumpTime = CompanionPawn->JumpMaxCount >= 2 && Gravity > KINDA_SMALL_NUMBER
+			? JumpSpeed / Gravity : -1.0f;
+		const float FirstHeight = SecondJumpTime > 0.0f ? JumpSpeed * SecondJumpTime * 0.5f : 0.0f;
+		const float Discriminant = FMath::Max(0.0f, JumpSpeed * JumpSpeed - 2.0f * Gravity * (ToDestination.Z - FirstHeight));
+		const float FlightTime = Gravity > KINDA_SMALL_NUMBER
+			? FMath::Max(SecondJumpTime, 0.0f) + (JumpSpeed + FMath::Sqrt(Discriminant)) / Gravity : 1.0f;
+		Velocity = (ToDestination.GetSafeNormal2D() * (ToDestination.Size2D() / FMath::Max(FlightTime, 0.1f)))
+			.GetClampedToMaxSize(Movement->MaxWalkSpeed);
+		Velocity.Z = JumpSpeed;
+		if (ToDestination.Z < -5.0f)
+		{
+			// Downward links remain walk-off attempts, including invalid landings.
+			Velocity = FVector::ZeroVector;
+			SecondJumpTime = -1.0f;
+		}
+		if (GetWorld()->GetTimeSeconds() - LastWarningTime >= 2.0)
+		{
+			LastWarningTime = GetWorld()->GetTimeSeconds();
+			UE_LOG(LogTemp, Display, TEXT("Jump link %s: attempting anyway; prediction: %s."), *GetName(), *FailureReason);
+		}
 	}
 
 	FTraversal State;

@@ -33,6 +33,15 @@ merely placing them on a visible mesh does not guarantee navigation connectivity
 
 ## Jump Limits and Behaviour
 
+- **Attempt Unreachable Jumps** is enabled by default. When prediction cannot find
+  a valid arc (height, distance, blocked clearance, or landing validation), the AI
+  still jumps toward the link endpoint using normal jump strength and capped
+  horizontal speed. Agile schedules its second jump near the first apex. These
+  attempts can collide, fall short, or miss the landing; that is expected during
+  prototype tuning. Disable the setting on a link to restore strict rejection.
+  The character still needs to reach the smart link on a navigation route and be
+  grounded with jumping enabled. This setting does not create navigation links.
+
 - The launch uses the character's existing Jump Z Velocity, current world gravity,
   Gravity Scale, capsule, and Max Walk Speed. It first tries a single jump. If that
   cannot reach safely and the character has at least two allowed jumps, it checks
@@ -42,7 +51,7 @@ merely placing them on a visible mesh does not guarantee navigation connectivity
   fall, with no upward launch. Place the lower endpoint close to the ledge: this
   does not grant extra horizontal reach or let the character cross a wide gap.
 - The landing surface is checked. For jumps, Unreal predicts the arc and the full
-  capsule is swept along the samples to reject blocked routes. Drops use normal
+  capsule is swept along the samples to assess blocked routes. Drops use normal
   walking/falling collision and a bounded horizontal speed after leaving the edge.
 - Normal following is paused during the jump. Air steering and falling drag are
   temporarily suppressed for the calculated trajectory, then restored afterward.
@@ -59,9 +68,9 @@ segments when the AI attempts it. Open Output Log and search for **Jump link** f
 rejection reasons: unreachable height/distance, blocked arc, invalid landing,
 landing outside tolerance, or timeout. Warnings are throttled to avoid log spam.
 
-If no attempt or warning appears, first check the navigation connection and whether
-another route/link is being chosen. Debug drawing does not make a rejected link
-reachable. Do not increase character jump strength merely to bypass a blocked arc.
+If no attempt or message appears, check the navigation connection and whether
+another route/link is being chosen. The log says `attempting anyway` when an
+invalid prediction falls back to an attempt. Debug drawing does not change physics.
 
 Enter `companion.Follow.Debug 1` in the console to log follow status in Output Log
 (search for `Companion follow`). It distinguishes a missing navigable ground
@@ -86,7 +95,7 @@ the real UE 5.6 map, NavMesh connectivity, visuals, and runtime routing still ne
 the PC test above. Planning/traversal automation uses primitive test geometry and
 synthetic paths, not a baked copy of the blockout NavMesh.
 
-UnrealHeaderTool and the Development Editor compatibility build passed. All thirteen
+UnrealHeaderTool and the Development Editor compatibility build passed. All fourteen
 MechanicTesting automation tests passed with zero test warnings or failures. Tests exercise
 reachable jumps for both roles, physical traversal up and down, blocked and
 unreachable routes, landing/resuming, switching possession, timeout, and cleanup.
@@ -98,3 +107,6 @@ and checks landing, restored movement settings, excessive distance, and a blocke
 ceiling. A follow regression checks that proximity on a lower platform does not
 stop the request or satisfy the native path-reach test. Baked NavMesh routing and
 Windows UE 5.6 still require the level test above.
+The attempt-mode test checks that both roles launch on an unreachable upward link,
+Agile schedules a second jump, strict mode remains available, and switching to
+player control cancels the pending attempt.
