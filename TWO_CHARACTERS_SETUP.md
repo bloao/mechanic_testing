@@ -7,17 +7,17 @@ meshes and animations, the shared ability base, and the existing companion contr
 ## One-Time Setup
 
 1. Close Unreal and build the updated project with UE 5.6. Reopen it after compiling.
-2. Open the teammate's `/Game/ThirdPerson/Lvl_ThirdPerson` blockout.
-3. Open **Window > World Settings**. Set **GameMode Override** to **CompanionGameMode**.
-   This is essential: the map's old Blueprint override takes precedence over the
-   new project default. Save the map on your PC in 5.6.
+2. Open `/Game/ThirdPerson/Lvl_ThirdPerson` or `/Game/ThirdPerson/LVL_level2`.
+3. Both levels now select the complete companion GameMode through
+   `CompanionGameInstance`. No map override edit or map resave is required.
+   See `MECHANICS_INTEGRATION.md` for the current Windows build and test workflow.
 4. Keep one PlayerStart with clear, flat floor around it (at least 250 cm on a side).
    Do not place two more template characters: the GameMode spawns the pair for you.
-   If you previously placed test characters, disable **Auto Possess Player** on them.
+   Old placed player pawns have auto-possession disabled for the play session.
    Existing actors are not deleted or hidden by this setup.
-5. Make sure a **Nav Mesh Bounds Volume** covers the playable floor. Press **P** to
-   check the green walkable area. AI following needs navigation; character switching
-   and abilities can be tested even before navigation is built.
+5. Existing NavMesh bounds are used. Missing bounds receive transient runtime
+   coverage at Play. For an editor navigation preview and route design, keep an
+   authored **Nav Mesh Bounds Volume**, press **P**, and Build Paths.
 6. Press **Play**, not Simulate. In PIE's Outliner, the runtime actors are labeled
    **Agile** and **Strong**. Stopping Play removes these runtime actors; they spawn
    again next time. They will not appear as placed actors while editing the map.

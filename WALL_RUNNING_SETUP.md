@@ -1,5 +1,9 @@
 # Agile Wall Running
 
+Current complete two-level startup and Windows build instructions are in
+`MECHANICS_INTEGRATION.md`. Both gameplay levels use the native companion setup
+without resaving assets; the manual Blueprint workflow below is optional legacy setup.
+
 This prototype uses the existing companion controller and Third Person character.
 The controller gives double jump and wall running to the same companion selected
 by `Agile Companion Index` (default `0`). The other companion retains one jump.
@@ -40,7 +44,8 @@ the manual Blueprint placement/reparenting workflow below.
 
 ## Test Course and Controls
 
-- Add a tall, long cube wall with simple collision, **WorldStatic** object type,
+- Add a tall, long cube wall with simple collision, **WorldStatic** or stationary
+  **WorldDynamic** object type (no physics simulation),
   and collision that blocks **Pawn**. Floors should also have static collision.
   Use a wall roughly 1000 cm long and 400 cm high to start with.
 - Move alongside the wall and jump. Continue moving along it while airborne.
