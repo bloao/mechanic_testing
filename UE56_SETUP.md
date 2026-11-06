@@ -6,8 +6,8 @@ and breakable framework, and the wall-run automation tests. The 5.6 Content asse
 and map settings are retained unchanged; Mac 5.3 Blueprints were not copied over them.
 Adding C++ source does not automatically reparent or configure existing Blueprints.
 
-For the complete setup in **both gameplay levels**, use `MECHANICS_INTEGRATION.md`.
-Runtime startup now selects the complete GameMode for both maps; no Blueprint
+For the complete setup in **every project level**, use `MECHANICS_INTEGRATION.md`.
+Runtime startup selects the complete GameMode for all project maps; no Blueprint
 reparenting or map resave is required.
 
 ## Windows Build
@@ -51,8 +51,8 @@ setup must be rebuilt and tested on the PC; that newer change is not yet verifie
 
 Use `TWO_CHARACTERS_SETUP.md` for the native pair setup:
 
-1. Open `/Game/ThirdPerson/Lvl_ThirdPerson` or `/Game/ThirdPerson/LVL_level2`.
-   The shared GameInstance selects the companion GameMode in both levels,
+1. Open any project map, including either construction blockout copy.
+   The shared GameInstance selects the companion GameMode in every project level,
    including when a legacy map override is saved. Map assets need no changes.
 2. Keep PlayerStart on clear floor and add/retain a Nav Mesh Bounds Volume.
 3. Press Play. The GameMode spawns Agile (Quinn) and Strong (Manny), assigns abilities

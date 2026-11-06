@@ -7,8 +7,8 @@ meshes and animations, the shared ability base, and the existing companion contr
 ## One-Time Setup
 
 1. Close Unreal and build the updated project with UE 5.6. Reopen it after compiling.
-2. Open `/Game/ThirdPerson/Lvl_ThirdPerson` or `/Game/ThirdPerson/LVL_level2`.
-3. Both levels now select the complete companion GameMode through
+2. Open any project map, including either `Lvl_ConstructionBlockout` copy.
+3. Every project level selects the complete companion GameMode through
    `CompanionGameInstance`. No map override edit or map resave is required.
    See `MECHANICS_INTEGRATION.md` for the current Windows build and test workflow.
 4. Keep one PlayerStart with clear, flat floor around it (at least 250 cm on a side).

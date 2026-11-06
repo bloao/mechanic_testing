@@ -2,16 +2,24 @@
 
 #include "CompanionGameMode.h"
 #include "Engine/World.h"
-#include "Misc/Paths.h"
+#include "Templates/UnrealTemplate.h"
+
+AGameModeBase* UCompanionGameInstance::CreateGameModeForURL(FURL InURL, UWorld* InWorld)
+{
+	// Use the full package URL here: OverrideGameModeClass receives only a short
+	// name, which cannot distinguish project maps from Engine utility worlds.
+	const bool bProjectMap = InURL.Map.StartsWith(TEXT("/Game/"), ESearchCase::IgnoreCase);
+	TGuardValue<bool> SelectionScope(bCreatingCompanionGameplayMode, bProjectMap);
+	return Super::CreateGameModeForURL(InURL, InWorld);
+}
 
 TSubclassOf<AGameModeBase> UCompanionGameInstance::OverrideGameModeClass(
 	TSubclassOf<AGameModeBase> GameModeClass, const FString& MapName, const FString& Options, const FString& Portal) const
 {
-	const FString LevelName = UWorld::RemovePIEPrefix(FPaths::GetBaseFilename(MapName));
-	if (LevelName.Equals(TEXT("Lvl_ThirdPerson"), ESearchCase::IgnoreCase)
-		|| LevelName.Equals(TEXT("LVL_level2"), ESearchCase::IgnoreCase))
+	if (bCreatingCompanionGameplayMode)
 	{
-		// A map-local template GameMode can otherwise bypass the project default.
+		// Every project map, including new copies and PIE instances, receives the
+		// shared playable characters, abilities, AI controller and navigation setup.
 		return ACompanionGameMode::StaticClass();
 	}
 	return Super::OverrideGameModeClass(GameModeClass, MapName, Options, Portal);

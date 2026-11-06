@@ -829,19 +829,27 @@ bool FCompanionLevelIntegrationTest::RunTest(const FString& Parameters)
 	UCompanionGameInstance* Instance = NewObject<UCompanionGameInstance>();
 	TestWorld.World->GetWorldSettings()->DefaultGameMode = AGameModeBase::StaticClass();
 	for (const TCHAR* MapName : {TEXT("/Game/ThirdPerson/Lvl_ThirdPerson"), TEXT("/Game/ThirdPerson/LVL_level2"),
-		TEXT("/Game/ThirdPerson/UEDPIE_0_Lvl_ThirdPerson"), TEXT("/Game/ThirdPerson/UEDPIE_3_LVL_level2")})
+		TEXT("/Game/ThirdPerson/Lvl_ConstructionBlockout"), TEXT("/Game/ConstructionLevel/Lvl_ConstructionBlockout"),
+		TEXT("/Game/ThirdPerson/Maps/ThirdPersonMap"), TEXT("/Game/BlockingStarterPack/Maps/Blocking_ExempleMap"),
+		TEXT("/Game/BlockingStarterPack/Maps/Demonstration1"), TEXT("/Game/BlockingStarterPack/Maps/Demonstration2"),
+		TEXT("/Game/BlockingStarterPack/Maps/Overview"), TEXT("/Game/BlockingStarterPack/Maps/Props_AssetMap"),
+		TEXT("/Game/NewArea/Lvl_NewlyAdded"), TEXT("/Game/ThirdPerson/UEDPIE_0_Lvl_ThirdPerson"),
+		TEXT("/Game/ThirdPerson/UEDPIE_3_LVL_level2"), TEXT("/Game/ConstructionLevel/UEDPIE_1_Lvl_ConstructionBlockout")})
 	{
 		const FURL URL(nullptr, MapName, TRAVEL_Absolute);
 		AGameModeBase* SelectedMode = Instance->CreateGameModeForURL(URL, TestWorld.World);
 		TestNotNull(TEXT("Each gameplay level resolves a GameMode"), SelectedMode);
 		if (!SelectedMode) return false;
-		TestTrue(TEXT("Both levels override a saved legacy GameMode with the complete setup"), SelectedMode->IsA<ACompanionGameMode>());
-		TestEqual(TEXT("Both levels use the native playable character"), SelectedMode->DefaultPawnClass.Get(), ACompanionPlayableCharacter::StaticClass());
-		TestEqual(TEXT("Both levels use the companion switching controller"), SelectedMode->PlayerControllerClass.Get(), ACompanionSwitchPlayerController::StaticClass());
+		TestTrue(TEXT("Every project map overrides a legacy GameMode with the complete setup"), SelectedMode->IsA<ACompanionGameMode>());
+		TestEqual(TEXT("Every project map uses the native playable character"), SelectedMode->DefaultPawnClass.Get(), ACompanionPlayableCharacter::StaticClass());
+		TestEqual(TEXT("Every project map uses the companion switching controller"), SelectedMode->PlayerControllerClass.Get(), ACompanionSwitchPlayerController::StaticClass());
 		SelectedMode->Destroy();
 	}
-	TestEqual(TEXT("Other maps retain their selected GameMode"), Instance->OverrideGameModeClass(
-		AGameModeBase::StaticClass(), TEXT("/Game/Other/TestMap"), TEXT(""), TEXT("")).Get(), AGameModeBase::StaticClass());
+	AGameModeBase* EngineMode = Instance->CreateGameModeForURL(
+		FURL(nullptr, TEXT("/Engine/Maps/Entry"), TRAVEL_Absolute), TestWorld.World);
+	if (!TestNotNull(TEXT("Engine utility worlds retain a GameMode"), EngineMode)) return false;
+	TestEqual(TEXT("Project selection does not leak into Engine utility worlds"), EngineMode->GetClass(), AGameModeBase::StaticClass());
+	EngineMode->Destroy();
 	ACompanionPlayableCharacter* Defaults = GetMutableDefault<ACompanionPlayableCharacter>();
 	TestTrue(TEXT("Native player always has the custom movement component"), Defaults->GetCharacterMovement()->IsA<UCompanionCharacterMovementComponent>());
 

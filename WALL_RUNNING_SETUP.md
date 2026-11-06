@@ -1,7 +1,7 @@
 # Agile Wall Running
 
-Current complete two-level startup and Windows build instructions are in
-`MECHANICS_INTEGRATION.md`. Both gameplay levels use the native companion setup
+Current project-wide startup and Windows build instructions are in
+`MECHANICS_INTEGRATION.md`. Every project level uses the native companion setup
 without resaving assets; the manual Blueprint workflow below is optional legacy setup.
 
 This prototype uses the existing companion controller and Third Person character.

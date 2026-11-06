@@ -1,7 +1,10 @@
-# Complete mechanics in both gameplay levels
+# Shared mechanics in every project level
 
-The integrated gameplay levels are `/Game/ThirdPerson/Lvl_ThirdPerson` and
-`/Game/ThirdPerson/LVL_level2`. Their map packages, external actors, meshes,
+Every project map under `/Game/` receives the shared mechanics automatically,
+including newly added maps and their Play In Editor copies. This includes
+`/Game/ThirdPerson/Lvl_ThirdPerson`, `/Game/ThirdPerson/LVL_level2`, both copies of
+`Lvl_ConstructionBlockout` (under `ThirdPerson` and `ConstructionLevel`), and
+`/Game/ThirdPerson/Maps/ThirdPersonMap`. Their map packages, external actors, meshes,
 materials, transforms, collision settings and gravity settings are preserved.
 The mechanics setup happens in the play session rather than resaving the maps.
 
@@ -22,14 +25,14 @@ discard changes. Pass `-EngineRoot` for a different UE 5.6 installation location
 
 ## Shared level startup
 
-`CompanionGameInstance` chooses `CompanionGameMode` for both named gameplay levels,
-including their Play In Editor copies. A saved template GameMode override cannot
-silently replace the native playable character or companion controller. Other map
-names retain their selected GameMode. The existing meshes, animation Blueprints,
+`CompanionGameInstance` chooses `CompanionGameMode` for every project map using its
+full package URL. A saved template GameMode override cannot silently replace the
+native playable character or companion controller. Engine utility worlds retain
+their selected GameMode. The existing meshes, animation Blueprints,
 input assets and per-level gravity are still used.
 
 The movement and AI logic are shared C++ classes, rather than separate copies
-stored in each map. Both levels select that same setup. If a level saves a null
+stored in each map. Every project level selects that same setup. If a level saves a null
 or disabled navigation configuration, the native startup supplies the shared
 navigation configuration for the play session, without resaving the map.
 
@@ -77,7 +80,7 @@ as described in `SMART_JUMP_LINK_SETUP.md`.
 
 ## Confirm the active version
 
-Test each level with Play, rather than Simulate. Runtime actors should be labeled
+Test levels with Play, rather than Simulate. Runtime actors should be labeled
 Agile and Strong. Output Log prints `Companion mechanics active in ...` with the
 native character/controller classes. Test Agile's double jump, opposing-wall
 transfers while holding forward, Tab switching, Strong's E smash on a configured
@@ -93,8 +96,10 @@ PlayerStart; Agile can still use its movement abilities.
 The native compatibility build and all **16** `MechanicTesting` automation tests
 passed with zero test warnings or failures for this integration.
 
-The integration tests exercise both gameplay map names and PIE names through
-Unreal's GameMode creation path, deliberately overriding a legacy GameMode. They
+The integration tests exercise all current project map names, construction maps,
+a previously unlisted future map, and PIE names through Unreal's GameMode creation
+path, deliberately overriding a legacy GameMode. They check that this selection
+does not leak into Engine utility worlds. They
 also build a walkable runtime NavMesh, check reuse of authored navigation bounds,
 preserve physical transforms/collision, and create the pair on a small Blueprint-style platform.
 Continuous-run tests cover static and Blueprint-style dynamic walls. Existing
