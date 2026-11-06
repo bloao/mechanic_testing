@@ -4,12 +4,14 @@
 #include "CompanionPlayableCharacter.h"
 #include "CompanionSwitchPlayerController.h"
 #include "CollisionQueryParams.h"
+#include "AI/NavigationSystemConfig.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/WorldSettings.h"
 #include "NavigationSystem.h"
 #include "NavMesh/NavMeshBoundsVolume.h"
 
@@ -55,7 +57,12 @@ ANavMeshBoundsVolume* ACompanionGameMode::EnsureNavigationBounds()
 	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 	if (!Navigation)
 	{
-		FNavigationSystem::AddNavigationSystemToWorld(*GetWorld(), FNavigationSystemRunMode::GameMode);
+		// Some map copies save a disabled/null navigation config. Use the shared
+		// companion navigation system for this play session without resaving them.
+		UNavigationSystemConfig* SharedConfig = NewObject<UNavigationSystemConfig>(this);
+		SharedConfig->NavigationSystemClass = FSoftClassPath(UNavigationSystemV1::StaticClass()->GetPathName());
+		GetWorld()->GetWorldSettings()->SetNavigationSystemConfigOverride(SharedConfig);
+		FNavigationSystem::AddNavigationSystemToWorld(*GetWorld(), FNavigationSystemRunMode::GameMode, SharedConfig, true, true);
 		Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 	}
 	if (!Navigation) return nullptr;
@@ -163,9 +170,9 @@ ACompanionCharacterBase* ACompanionGameMode::SpawnStrongCompanion()
 	const FVector Right = AgileCompanion->GetActorRightVector();
 	const FVector Forward = AgileCompanion->GetActorForwardVector();
 	const FCollisionQueryParams Query(SCENE_QUERY_STAT(CompanionSpawnFloor), false, AgileCompanion);
-	FCollisionObjectQueryParams FloorObjects;
-	FloorObjects.AddObjectTypesToQuery(ECC_WorldStatic);
-	FloorObjects.AddObjectTypesToQuery(ECC_WorldDynamic);
+	FCollisionResponseParams FloorResponses(ECR_Ignore);
+	FloorResponses.CollisionResponse.SetResponse(ECC_WorldStatic, ECR_Block);
+	FloorResponses.CollisionResponse.SetResponse(ECC_WorldDynamic, ECR_Block);
 	const float MinSeparation = AgileCompanion->GetCapsuleComponent()->GetScaledCapsuleRadius()
 		+ Defaults->GetCapsuleComponent()->GetScaledCapsuleRadius() + 10.0f;
 	for (float Scale : {1.0f, 0.75f, 0.5f, 0.0f})
@@ -177,8 +184,8 @@ ACompanionCharacterBase* ACompanionGameMode::SpawnStrongCompanion()
 		{
 			const FVector Candidate = AgileCompanion->GetActorLocation() + Direction * Distance;
 			FHitResult Floor;
-			if (!GetWorld()->LineTraceSingleByObjectType(Floor, Candidate + FVector::UpVector * 200.0,
-				Candidate - FVector::UpVector * 600.0, FloorObjects, Query)
+			if (!GetWorld()->LineTraceSingleByChannel(Floor, Candidate + FVector::UpVector * 200.0,
+				Candidate - FVector::UpVector * 600.0, ECC_Pawn, Query, FloorResponses)
 				|| Floor.ImpactNormal.Z < Defaults->GetCharacterMovement()->GetWalkableFloorZ()
 				|| !Floor.GetComponent() || Floor.GetComponent()->GetCollisionResponseToChannel(ECC_Pawn) != ECR_Block
 				|| Floor.GetComponent()->IsSimulatingPhysics() || !Floor.GetComponent()->GetComponentVelocity().IsNearlyZero(1.0f))

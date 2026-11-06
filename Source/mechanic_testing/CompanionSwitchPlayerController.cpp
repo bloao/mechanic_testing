@@ -378,13 +378,13 @@ bool ACompanionSwitchPlayerController::FindGroundBelowLeader(
 	const FVector Feet = Leader->GetCharacterMovement()->GetActorFeetLocation();
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(CompanionFollowGround), false, Leader);
 	Query.AddIgnoredActor(Follower);
-	FCollisionObjectQueryParams Objects;
-	Objects.AddObjectTypesToQuery(ECC_WorldStatic);
-	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
-	Objects.AddObjectTypesToQuery(ECC_PhysicsBody);
+	FCollisionResponseParams Responses(ECR_Ignore);
+	Responses.CollisionResponse.SetResponse(ECC_WorldStatic, ECR_Block);
+	Responses.CollisionResponse.SetResponse(ECC_WorldDynamic, ECR_Block);
+	Responses.CollisionResponse.SetResponse(ECC_PhysicsBody, ECR_Block);
 	FHitResult GroundHit;
-	if (!GetWorld()->LineTraceSingleByObjectType(GroundHit, Feet + FVector::UpVector * 10.0,
-		Feet - FVector::UpVector * FMath::Max(FollowGroundSearchDepth, 100.0f), Objects, Query)
+	if (!GetWorld()->LineTraceSingleByChannel(GroundHit, Feet + FVector::UpVector * 10.0,
+		Feet - FVector::UpVector * FMath::Max(FollowGroundSearchDepth, 100.0f), ECC_Pawn, Query, Responses)
 		|| GroundHit.bStartPenetrating || !Leader->GetCharacterMovement()->IsWalkable(GroundHit)
 		|| !GroundHit.GetComponent() || GroundHit.GetComponent()->GetCollisionResponseToChannel(ECC_Pawn) != ECR_Block)
 	{

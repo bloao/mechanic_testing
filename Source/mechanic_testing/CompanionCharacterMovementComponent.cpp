@@ -154,10 +154,12 @@ bool UCompanionCharacterMovementComponent::FindWall(const FVector& Direction, FH
 	const float Reach = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius() + WallDetectionDistance;
 	const FVector Start = UpdatedComponent->GetComponentLocation();
 	const FCollisionQueryParams Query(SCENE_QUERY_STAT(CompanionWallRun), false, CharacterOwner);
-	FCollisionObjectQueryParams Objects;
-	Objects.AddObjectTypesToQuery(ECC_WorldStatic);
-	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
-	return GetWorld()->LineTraceSingleByObjectType(Hit, Start, Start + Direction * Reach, Objects, Query)
+	FCollisionResponseParams Responses(ECR_Ignore);
+	Responses.CollisionResponse.SetResponse(ECC_WorldStatic, ECR_Block);
+	Responses.CollisionResponse.SetResponse(ECC_WorldDynamic, ECR_Block);
+	// Object-only traces treat overlap triggers as hits too. Trace using the
+	// player's blocking response so trigger volumes cannot hide solid walls.
+	return GetWorld()->LineTraceSingleByChannel(Hit, Start, Start + Direction * Reach, ECC_Pawn, Query, Responses)
 		&& Hit.bBlockingHit
 		&& Hit.GetComponent()
 		&& Hit.GetComponent()->GetCollisionResponseToChannel(ECC_Pawn) == ECR_Block

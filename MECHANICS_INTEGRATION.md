@@ -28,6 +28,11 @@ silently replace the native playable character or companion controller. Other ma
 names retain their selected GameMode. The existing meshes, animation Blueprints,
 input assets and per-level gravity are still used.
 
+The movement and AI logic are shared C++ classes, rather than separate copies
+stored in each map. Both levels select that same setup. If a level saves a null
+or disabled navigation configuration, the native startup supplies the shared
+navigation configuration for the play session, without resaving the map.
+
 The GameMode spawns Agile and Strong near PlayerStart. It checks additional
 directions and closer positions when geometry blocks the preferred spawn spot,
 without forcing the capsule inside obstacles. Agile's abilities are configured
@@ -50,6 +55,11 @@ Wall detection accepts Pawn-blocking, nearly vertical `WorldStatic` and stationa
 Simulating or moving walls are excluded. Geometry must have usable collision;
 this code does not create collision on decorative meshes or convert arbitrary
 props into breakable objects. Box pushing remains unimplemented.
+
+Wall detection, follow-ground detection and companion spawn-floor checks use
+Pawn-blocking channel traces. Overlap-only door/button/event triggers are ignored
+by these checks, so a trigger volume cannot hide a valid wall or floor. Existing
+trigger responses and events are retained.
 
 ## Navigation and routes
 
@@ -89,6 +99,10 @@ also build a walkable runtime NavMesh, check reuse of authored navigation bounds
 preserve physical transforms/collision, and create the pair on a small Blueprint-style platform.
 Continuous-run tests cover static and Blueprint-style dynamic walls. Existing
 smash, switching, following, jump/drop and facing regressions remain included.
+The latest regressions reproduce overlap volumes hiding walls and follow targets,
+and a disabled navigation configuration preventing runtime coverage. They also
+issue a real AI MoveTo request and verify the follower moves along the generated
+NavMesh toward the player.
 
 This Mac has UE 5.3, so native code is compiled/tested in an isolated compatibility
 project; the checkout retains UE 5.6 targets. The UE 5.6 map packages were inspected

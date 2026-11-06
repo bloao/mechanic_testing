@@ -9,6 +9,7 @@
 #include "mechanic_testing/CompanionSwitchPlayerController.h"
 #include "mechanic_testing/BreakableActor.h"
 #include "AIController.h"
+#include "AI/NavigationSystemConfig.h"
 #include "CollisionQueryParams.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -121,6 +122,14 @@ bool FCompanionWallRunEligibilityTest::RunTest(const FString& Parameters)
 		TestWorld.Character->SetActorLocation(FVector(0.0, 0.0, NearGroundHeight));
 		TestWorld.Step();
 		TestTrue(TEXT("Wall run can start only ten centimeters above the floor"), TestWorld.Movement->IsWallRunning());
+	}
+	{
+		FTestWorld TestWorld;
+		UBoxComponent* Trigger = TestWorld.AddBox(FVector(0.0, 35.0, 1000.0), FVector(5000.0, 5.0, 1000.0), nullptr, ECC_WorldDynamic);
+		Trigger->SetCollisionResponseToAllChannels(ECR_Overlap);
+		TestWorld.Step();
+		TestTrue(TEXT("An overlap trigger between the player and wall does not hide the wall"), TestWorld.Movement->IsWallRunning());
+		TestTrue(TEXT("Wall detection preserves the trigger's overlap response"), Trigger->GetCollisionResponseToChannel(ECC_Pawn) == ECR_Overlap);
 	}
 	for (float Side : {1.0f, -1.0f})
 	{
@@ -471,6 +480,11 @@ bool FCompanionAirborneFollowTest::RunTest(const FString& Parameters)
 	FVector Ground;
 	TestTrue(TEXT("Ground is found while leader is airborne"), CompanionController->FindGroundBelowLeader(TestWorld.Character, Follower, Ground));
 	TestTrue(TEXT("Follow location is the floor, not the airborne capsule"), FMath::IsNearlyZero(Ground.Z));
+	UBoxComponent* Trigger = TestWorld.AddBox(FVector(0.0, 0.0, 200.0), FVector(500.0, 500.0, 20.0), nullptr, ECC_WorldDynamic);
+	Trigger->SetCollisionResponseToAllChannels(ECR_Overlap);
+	TestTrue(TEXT("A trigger above the ground does not hide the follower's floor target"), CompanionController->FindGroundBelowLeader(TestWorld.Character, Follower, Ground));
+	TestTrue(TEXT("Trigger detection still finds the real floor"), FMath::IsNearlyZero(Ground.Z));
+	Trigger->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	TestWorld.Character->SetActorLocation(FVector(400.0, 0.0, 900.0));
 	TestTrue(TEXT("Ground tracking continues as the airborne leader moves"), CompanionController->FindGroundBelowLeader(TestWorld.Character, Follower, Ground));
 	TestTrue(TEXT("Ground target follows horizontal position"), FMath::IsNearlyEqual(Ground.X, 400.0));
@@ -841,6 +855,7 @@ bool FCompanionLevelIntegrationTest::RunTest(const FString& Parameters)
 	UBoxComponent* AuthoredFloor = TestWorld.AddBox(FVector(10000.0, 0.0, -50.0), FVector(150.0, 150.0, 50.0), nullptr, ECC_WorldDynamic);
 	const FTransform OriginalFloorTransform = AuthoredFloor->GetComponentTransform();
 	const FName OriginalProfile = AuthoredFloor->GetCollisionProfileName();
+	TestWorld.World->GetWorldSettings()->SetNavigationSystemConfigOverride(NewObject<UNullNavSysConfig>(TestWorld.World));
 	ANavMeshBoundsVolume* Bounds = Mode->EnsureNavigationBounds();
 	if (!TestNotNull(TEXT("A level without authored coverage receives runtime bounds"), Bounds)) return false;
 	TestTrue(TEXT("Generated bounds are transient"), Bounds->HasAnyFlags(RF_Transient));
@@ -867,6 +882,29 @@ bool FCompanionLevelIntegrationTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The companion pair can spawn on a small Blueprint-style platform"), Mode->SetupCompanionPair(Controller));
 	TestTrue(TEXT("Agile's wall-run ability is enabled after level setup"), TestWorld.Movement->bCanWallRun);
 	TestTrue(TEXT("Spawning also preserves the authored floor"), AuthoredFloor->GetComponentTransform().Equals(OriginalFloorTransform));
+
+	// Exercise the real AI MoveTo route on the generated NavMesh, not a synthetic
+	// path or a directly requested movement vector.
+	ACharacter* Follower = Controller->GetFollowerCompanion();
+	if (!TestNotNull(TEXT("The level has an AI follower"), Follower)) return false;
+	TestWorld.Character->SetActorLocation(FVector(1000.0, 0.0, 90.0));
+	TestWorld.Movement->SetMovementMode(MOVE_Walking);
+	Follower->SetActorLocation(FVector(0.0, 0.0, 90.0));
+	UCharacterMovementComponent* FollowerMovement = Follower->GetCharacterMovement();
+	FollowerMovement->SetMovementMode(MOVE_Walking);
+	FollowerMovement->Velocity = FVector::ZeroVector;
+	AAIController* FollowerAI = Cast<AAIController>(Follower->GetController());
+	if (!TestNotNull(TEXT("The follower receives an AI controller"), FollowerAI)) return false;
+	Controller->Tick(0.3f);
+	TestTrue(TEXT("The shared level setup issues AI MoveTo on the generated route"), FollowerAI->GetMoveStatus() == EPathFollowingStatus::Moving);
+	UPathFollowingComponent* Following = FollowerAI->GetPathFollowingComponent();
+	for (int32 Frame = 0; Frame < 120; ++Frame)
+	{
+		Following->TickComponent(1.0f / 60.0f, LEVELTICK_All, &Following->PrimaryComponentTick);
+		FollowerMovement->TickComponent(1.0f / 60.0f, LEVELTICK_All, &FollowerMovement->PrimaryComponentTick);
+	}
+	TestTrue(TEXT("AI MoveTo actually moves the companion toward the player"), Follower->GetActorLocation().X > 100.0);
+	TestTrue(TEXT("The follower reaches the player's vicinity"), FVector::Dist2D(Follower->GetActorLocation(), TestWorld.Character->GetActorLocation()) < 400.0);
 	return true;
 }
 
