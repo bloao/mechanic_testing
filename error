@@ -1,8 +1,5 @@
-git switch -c uni-main-446dde3 origin/main
-if ($LASTEXITCODE -ne 0) { throw "Checkout failed. See the Git error above." }
-
+Set-Location 'C:\Users\hsramin3\mechanic_testing-combined'
 git lfs pull origin
-if ($LASTEXITCODE -ne 0) { throw "LFS download failed. See the Git error above." }
 
-git log -1 --oneline
-git ls-tree -r --name-only HEAD | Select-String 'construction.*\.umap$'
+$files = git lfs ls-files
+$files -match 'Lvl_(ThirdPerson|ConstructionBlockout)\.umap$'
