@@ -1,3 +1,7 @@
-git fetch origin main 
-git switch --discard-changes -C main 07b8b23 
+git fetch origin main
+if ($LASTEXITCODE -ne 0) { throw "Fetch failed. Stopping." }
+
+git switch --discard-changes -C main 07b8b23
+if ($LASTEXITCODE -ne 0) { throw "Could not switch to 07b8b23. Stopping." }
+
 git lfs pull origin
