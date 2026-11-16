@@ -1,38 +1,8 @@
-PS C:\Users\hsramin3\mechanic_testing-combined> git lfs ls-files | Select-String 'Lvl_ConstructionBlockout\.umap$'
-PS C:\Users\hsramin3\mechanic_testing-combined> git remote get-url origin
-https://github.com/bloao/mechanic_testing.git
-PS C:\Users\hsramin3\mechanic_testing-combined> git pull --ff-only origin main
-remote: Enumerating objects: 29, done.
-remote: Counting objects: 100% (29/29), done.
-remote: Compressing objects: 100% (23/23), done.
-remote: Total 26 (delta 11), reused 5 (delta 3), pack-reused 0 (from 0)
-Unpacking objects: 100% (26/26), 7.30 KiB | 14.00 KiB/s, done.
-From https://github.com/bloao/mechanic_testing
- * branch            main       -> FETCH_HEAD
-   07b8b23..446dde3  main       -> origin/main
-hint: Diverging branches can't be fast-forwarded, you need to either:
-hint:
-hint:   git merge --no-ff
-hint:
-hint: or:
-hint:
-hint:   git rebase
-hint:
-hint: Disable this message with "git config set advice.diverging false"
-fatal: Not possible to fast-forward, aborting.
-PS C:\Users\hsramin3\mechanic_testing-combined>
-PS C:\Users\hsramin3\mechanic_testing-combined> $ProjectFile = Join-Path (Get-Location).Path "mechanic_testing.uproject"
+git switch -c uni-main-446dde3 origin/main
+if ($LASTEXITCODE -ne 0) { throw "Checkout failed. See the Git error above." }
 
-PS C:\Users\hsramin3\mechanic_testing-combined>
-PS C:\Users\hsramin3\mechanic_testing-combined> & "C:\Program Files\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat" mechanic_testingEditor Win64 Development "-Project=$ProjectFile" -WaitMutex -NoEngineChanges -NoHotReloadFromIDE -NoUBA -NoUBALocal
-Using bundled DotNet SDK version: 8.0.300 win-x64
-Running UnrealBuildTool: dotnet "..\..\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.dll" mechanic_testingEditor Win64 Development -Project=C:\Users\hsramin3\mechanic_testing-combined\mechanic_testing.uproject -WaitMutex -NoEngineChanges -NoHotReloadFromIDE -NoUBA -NoUBALocal
-Log file: C:\Users\hsramin3\AppData\Local\UnrealBuildTool\Log.txt
-Using 'git status' to determine working set for adaptive non-unity build (C:\Users\hsramin3\mechanic_testing-combined).
-Invalidating makefile for mechanic_testingEditor (cl.exe deleted)
-Visual Studio 2022 is installed, but is out of date or missing a valid C++ toolchain (minimum version 14.38.33130, preferred version 14.38.33130). Please update Visual Studio 2022 to 17.8 or later and verify that the "MSVC v143 - VS 2022 C++ x64/x86 build tools (v14.38-17.8)" component is selected in the Visual Studio 2022 installation options.
-Visual Studio 2022 x64 must be installed in order to build this target.
+git lfs pull origin
+if ($LASTEXITCODE -ne 0) { throw "LFS download failed. See the Git error above." }
 
-Result: Failed (OtherCompilationError)
-Total execution time: 1.05 seconds
-PS C:\Users\hsramin3\mechanic_testing-combined>
+git log -1 --oneline
+git ls-tree -r --name-only HEAD | Select-String 'construction.*\.umap$'
