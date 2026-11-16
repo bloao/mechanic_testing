@@ -1,7 +1,4 @@
-git fetch origin main
-if ($LASTEXITCODE -ne 0) { throw "Fetch failed. Stopping." }
+git log -1 --oneline
+git ls-tree -r --name-only HEAD | Select-String 'Lvl_ConstructionBlockout\.umap$'
+git lfs ls-files | Select-String 'Lvl_ConstructionBlockout\.umap$'
 
-git switch --discard-changes -C main 07b8b23
-if ($LASTEXITCODE -ne 0) { throw "Could not switch to 07b8b23. Stopping." }
-
-git lfs pull origin
