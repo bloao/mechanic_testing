@@ -1,5 +1,5 @@
-Set-Location 'C:\Users\hsramin3\mechanic_testing-combined'
-git lfs pull origin
+git fetch origin main
+if ($LASTEXITCODE -ne 0) { throw "Fetch failed." }
 
-$files = git lfs ls-files
-$files -match 'Lvl_(ThirdPerson|ConstructionBlockout)\.umap$'
+$maps = git ls-tree -r --name-only FETCH_HEAD
+$maps -match 'construction.*\.umap$'
