@@ -1,4 +1,10 @@
-git log -1 --oneline
-git ls-tree -r --name-only HEAD | Select-String 'Lvl_ConstructionBlockout\.umap$'
-git lfs ls-files | Select-String 'Lvl_ConstructionBlockout\.umap$'
 
+PS C:\Users\hsramin3\mechanic_testing-combined> git lfs pull origin
+PS C:\Users\hsramin3\mechanic_testing-combined> git log -1 --oneline
+43229bb (HEAD -> main) Add wall-run animations and Agile animation blueprint
+PS C:\Users\hsramin3\mechanic_testing-combined> git ls-tree -r --name-only HEAD | Select-String 'Lvl_ConstructionBlockout\.umap$'
+PS C:\Users\hsramin3\mechanic_testing-combined> git lfs ls-files | Select-String 'Lvl_ConstructionBlockout\.umap$'
+PS C:\Users\hsramin3\mechanic_testing-combined> git log -1 --oneline
+43229bb (HEAD -> main) Add wall-run animations and Agile animation blueprint
+PS C:\Users\hsramin3\mechanic_testing-combined> git ls-tree -r --name-only HEAD | Select-String 'Lvl_ConstructionBlockout\.umap$'
+PS C:\Users\hsramin3\mechanic_testing-combined> git lfs ls-files | Select-String 'Lvl_ConstructionBlockout\.umap$'
