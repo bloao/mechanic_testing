@@ -1,5 +1,13 @@
-git fetch origin main
-if ($LASTEXITCODE -ne 0) { throw "Fetch failed." }
+Set-Location 'C:\Users\hsramin3'
 
-$maps = git ls-tree -r --name-only FETCH_HEAD
+git clone --branch main https://github.com/bloao/mechanic_testing.git mechanic_testing-fresh
+if ($LASTEXITCODE -ne 0) { throw "Clone failed. See the Git error above." }
+
+Set-Location '.\mechanic_testing-fresh'
+
+git lfs pull origin
+if ($LASTEXITCODE -ne 0) { throw "LFS download failed. See the Git error above." }
+
+git log -1 --oneline
+$maps = git ls-tree -r --name-only HEAD
 $maps -match 'construction.*\.umap$'
