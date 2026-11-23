@@ -1,13 +1,29 @@
-Set-Location 'C:\Users\hsramin3'
-
-git clone --branch main https://github.com/bloao/mechanic_testing.git mechanic_testing-fresh
-if ($LASTEXITCODE -ne 0) { throw "Clone failed. See the Git error above." }
-
-Set-Location '.\mechanic_testing-fresh'
-
-git lfs pull origin
-if ($LASTEXITCODE -ne 0) { throw "LFS download failed. See the Git error above." }
-
-git log -1 --oneline
-$maps = git ls-tree -r --name-only HEAD
-$maps -match 'construction.*\.umap$'
+Cmd: companion.ContainerPush.Debug 1
+companion.ContainerPush.Debug = "1"
+LogBlueprintUserMessages: [BP_real_open_container_C_1] true
+LogCompanionTerminal: Display: CompanionPlayableCharacter_2 (Strong) used BP_Terminal_C_0: applying 2.00x size for 20.0 seconds.
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=200.00, Y=-0.00) Actual=V(X=200.00, Y=-0.00) AimNormal=V(X=-1.00, Y=0.00) AimStartedOverlapping=0 Blocked=0 Blocker=None BlockerComponent=None PushStartedOverlapping=0
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=200.00, Y=-0.00) Actual=V(X=200.00, Y=-0.00) AimNormal=V(X=-1.00, Y=0.00) AimStartedOverlapping=0 Blocked=0 Blocker=None BlockerComponent=None PushStartedOverlapping=0
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-200.00, Y=0.00) Actual=V(0) AimNormal=V(X=1.00, Y=-0.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-200.00, Y=0.00) Actual=V(0) AimNormal=V(X=1.00, Y=-0.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-200.00, Y=0.00) Actual=V(0) AimNormal=V(X=1.00, Y=-0.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-200.00, Y=0.00) Actual=V(0) AimNormal=V(X=1.00, Y=-0.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-200.00, Y=0.00) Actual=V(0) AimNormal=V(X=1.00, Y=-0.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-200.00, Y=0.00) Actual=V(0) AimNormal=V(X=1.00, Y=-0.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-200.00, Y=0.00) Actual=V(0) AimNormal=V(X=1.00, Y=-0.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-200.00, Y=0.00) Actual=V(0) AimNormal=V(X=1.00, Y=-0.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-200.00, Y=0.00) Actual=V(0) AimNormal=V(X=1.00, Y=-0.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-200.00, Y=0.00) Actual=V(0) AimNormal=V(X=1.00, Y=-0.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-200.00, Y=0.00) Actual=V(0) AimNormal=V(X=1.00, Y=-0.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-200.00, Y=0.00) Actual=V(0) AimNormal=V(X=1.00, Y=-0.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Aim hit a different target. Actor=CompanionPlayableCharacter_0 Component=CollisionCylinder Mesh=None
+LogContainerPush: Display: Aim hit a different target. Actor=CompanionPlayableCharacter_0 Component=CollisionCylinder Mesh=None
+LogContainerPush: Display: Aim hit a different target. Actor=CompanionPlayableCharacter_0 Component=CollisionCylinder Mesh=None
+LogContainerPush: Display: Aim hit a different target. Actor=CompanionPlayableCharacter_0 Component=CollisionCylinder Mesh=None
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-0.00, Y=-200.00) Actual=V(0) AimNormal=V(X=0.00, Y=1.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-0.00, Y=-200.00) Actual=V(0) AimNormal=V(X=0.00, Y=1.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-0.00, Y=-200.00) Actual=V(0) AimNormal=V(X=0.00, Y=1.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=-0.00, Y=-200.00) Actual=V(0) AimNormal=V(X=0.00, Y=1.00, Z=-0.00) AimStartedOverlapping=0 Blocked=1 Blocker=StaticMeshActor_910 BlockerComponent=StaticMeshComponent0 PushStartedOverlapping=1
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=200.00, Y=-0.00) Actual=V(X=200.00, Y=-0.00) AimNormal=V(X=-1.00, Y=0.00) AimStartedOverlapping=0 Blocked=0 Blocker=None BlockerComponent=None PushStartedOverlapping=0
+LogContainerPush: Display: Target=StaticMeshActor_912 Requested=V(X=200.00, Y=-0.00) Actual=V(X=200.00, Y=-0.00) AimNormal=V(X=-1.00, Y=0.00) AimStartedOverlapping=0 Blocked=0 Blocker=None BlockerComponent=None PushStartedOverlapping=0
+LogSlate: Updating window title bar state: overlay mode, drag disabled, window buttons hidden, title bar hidden
