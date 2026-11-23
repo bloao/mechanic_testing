@@ -25,7 +25,38 @@
 DEFINE_LOG_CATEGORY_STATIC(LogContainerPush, Log, All);
 
 static TAutoConsoleVariable<int32> CVarContainerPushDebug(
-	TEXT("companion.ContainerPush.Debug"), 0, TEXT("Log targeting and collision for each container push."));
+	TEXT("companion.ContainerPush.Debug"), 0, TEXT("Log container grab targeting and blocked movement."));
+
+namespace
+{
+	float GetAllowedMoveFraction(UPrimitiveComponent& Component, const UPrimitiveComponent& Partner,
+		const FVector& Delta, FHitResult& BlockingHit)
+	{
+		FComponentQueryParams Query(SCENE_QUERY_STAT(CompanionContainerMove), Component.GetOwner());
+		Query.AddIgnoredComponent(&Partner);
+		TArray<FHitResult> Hits;
+		const FVector Start = Component.GetComponentLocation();
+		Component.GetWorld()->ComponentSweepMulti(Hits, &Component, Start, Start + Delta, Component.GetComponentQuat(), Query);
+
+		const FVector Direction = Delta.GetSafeNormal();
+		float Fraction = 1.0f;
+		for (const FHitResult& Hit : Hits)
+		{
+			// Contact with the floor should still allow a horizontal slide. An
+			// initial overlap blocks motion only when it would deepen the overlap.
+			if (!Hit.bBlockingHit || (Hit.bStartPenetrating && FVector::DotProduct(Direction, Hit.Normal) >= -KINDA_SMALL_NUMBER))
+			{
+				continue;
+			}
+			if (Hit.Time < Fraction)
+			{
+				Fraction = Hit.Time;
+				BlockingHit = Hit;
+			}
+		}
+		return Fraction;
+	}
+}
 
 ACompanionPlayableCharacter::ACompanionPlayableCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -106,7 +137,7 @@ void ACompanionPlayableCharacter::ApplyAppearance()
 void ACompanionPlayableCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
-	PlayerInputComponent->BindKey(PushContainerKey, IE_Pressed, this, &ACompanionPlayableCharacter::PushLargeContainer);
+	PlayerInputComponent->BindKey(PushContainerKey, IE_Pressed, this, &ACompanionPlayableCharacter::ToggleContainerGrab);
 	UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent);
 	UInputAction* LoadedMove = MoveAction.LoadSynchronous();
 	UInputAction* LoadedJump = JumpAction.LoadSynchronous();
@@ -116,6 +147,8 @@ void ACompanionPlayableCharacter::SetupPlayerInputComponent(UInputComponent* Pla
 		return;
 	}
 	EnhancedInput->BindAction(LoadedMove, ETriggerEvent::Triggered, this, &ACompanionPlayableCharacter::Move);
+	EnhancedInput->BindAction(LoadedMove, ETriggerEvent::Completed, this, &ACompanionPlayableCharacter::ClearContainerMoveInput);
+	EnhancedInput->BindAction(LoadedMove, ETriggerEvent::Canceled, this, &ACompanionPlayableCharacter::ClearContainerMoveInput);
 	EnhancedInput->BindAction(LoadedJump, ETriggerEvent::Started, this, &ACompanionPlayableCharacter::Jump);
 	EnhancedInput->BindAction(LoadedJump, ETriggerEvent::Completed, this, &ACompanionPlayableCharacter::StopJumping);
 	EnhancedInput->BindAction(LoadedJump, ETriggerEvent::Canceled, this, &ACompanionPlayableCharacter::StopJumping);
@@ -150,6 +183,7 @@ void ACompanionPlayableCharacter::PawnClientRestart()
 
 void ACompanionPlayableCharacter::UnPossessed()
 {
+	ReleaseContainer();
 	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* InputSubsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
@@ -165,13 +199,49 @@ void ACompanionPlayableCharacter::UnPossessed()
 
 void ACompanionPlayableCharacter::Move(const FInputActionValue& Value)
 {
+	const FVector2D Input = Value.Get<FVector2D>();
+	if (IsHoldingContainer())
+	{
+		ContainerMoveInput = Input;
+		return;
+	}
 	if (GetController())
 	{
-		const FVector2D Input = Value.Get<FVector2D>();
 		const FRotator YawRotation(0.0, GetControlRotation().Yaw, 0.0);
 		AddMovementInput(FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X), Input.Y);
 		AddMovementInput(FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y), Input.X);
 	}
+}
+
+void ACompanionPlayableCharacter::ClearContainerMoveInput()
+{
+	ContainerMoveInput = FVector2D::ZeroVector;
+}
+
+void ACompanionPlayableCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (IsHoldingContainer() && bCanSmash && HasTemporaryGrowth() && GetCharacterMovement()->IsMovingOnGround())
+	{
+		MoveHeldContainer(DeltaSeconds);
+	}
+	else
+	{
+		ReleaseContainer();
+	}
+}
+
+void ACompanionPlayableCharacter::Jump()
+{
+	ReleaseContainer();
+	Super::Jump();
+}
+
+void ACompanionPlayableCharacter::ReleaseContainer()
+{
+	HeldContainer.Reset();
+	ClearContainerMoveInput();
+	ContainerMoveVelocity = FVector2D::ZeroVector;
 }
 
 void ACompanionPlayableCharacter::Look(const FInputActionValue& Value)
@@ -186,22 +256,26 @@ void ACompanionPlayableCharacter::Smash()
 	PerformSmash();
 }
 
-void ACompanionPlayableCharacter::PushLargeContainer()
+void ACompanionPlayableCharacter::ToggleContainerGrab()
 {
+	if (IsHoldingContainer())
+	{
+		ReleaseContainer();
+		return;
+	}
 	const bool bDebug = CVarContainerPushDebug.GetValueOnGameThread() != 0;
 	const bool bHasGrowth = HasTemporaryGrowth();
-	if (!bCanSmash || !bHasGrowth)
+	if (!bCanSmash || !bHasGrowth || !GetCharacterMovement()->IsMovingOnGround())
 	{
 		if (bDebug)
 		{
-			UE_LOG(LogContainerPush, Display, TEXT("Rejected %s: Strong=%d, growth active=%d."),
-				*GetName(), bCanSmash, bHasGrowth);
+			UE_LOG(LogContainerPush, Display, TEXT("Rejected %s: Strong=%d, growth active=%d, grounded=%d."),
+				*GetName(), bCanSmash, bHasGrowth, GetCharacterMovement()->IsMovingOnGround());
 		}
 		return;
 	}
 
 	constexpr float PushReach = 150.0f;
-	constexpr float PushDistance = 200.0f;
 	constexpr float PushAimRadius = 30.0f;
 	static const FName LargeContainerMeshName(TEXT("SM_ContainerClosed_Large"));
 
@@ -236,21 +310,64 @@ void ACompanionPlayableCharacter::PushLargeContainer()
 		return;
 	}
 
-	// Level containers can be placed as static meshes. Move the hit component
-	// with a sweep so blocking geometry can stop the push.
+	if (Container->IsSimulatingPhysics() || !Container->IsQueryCollisionEnabled())
+	{
+		if (bDebug)
+		{
+			UE_LOG(LogContainerPush, Display, TEXT("Grab needs a container with query collision and physics simulation off."));
+		}
+		return;
+	}
+
 	const FVector PushDirection = -Hit.ImpactNormal.GetSafeNormal2D();
 	Container->SetMobility(EComponentMobility::Movable);
-	const FVector RequestedDelta = (PushDirection.IsNearlyZero() ? AimDirection : PushDirection) * PushDistance;
-	const FVector BeforePush = Container->GetComponentLocation();
-	FHitResult PushHit;
-	Container->AddWorldOffset(RequestedDelta, true, bDebug ? &PushHit : nullptr);
+	ContainerForward = PushDirection.IsNearlyZero() ? AimDirection : PushDirection;
+	GetCharacterMovement()->StopMovementImmediately();
+	ConsumeMovementInputVector();
+	SetActorRotation(ContainerForward.Rotation());
+	HeldContainer = Container;
 	if (bDebug)
 	{
-		const FVector ActualDelta = Container->GetComponentLocation() - BeforePush;
-		UE_LOG(LogContainerPush, Display,
-			TEXT("Target=%s Requested=%s Actual=%s AimNormal=%s AimStartedOverlapping=%d Blocked=%d Blocker=%s BlockerComponent=%s PushStartedOverlapping=%d"),
-			*GetNameSafe(Hit.GetActor()), *RequestedDelta.ToCompactString(), *ActualDelta.ToCompactString(),
-			*Hit.ImpactNormal.ToCompactString(), Hit.bStartPenetrating, PushHit.bBlockingHit,
-			*GetNameSafe(PushHit.GetActor()), *GetNameSafe(PushHit.GetComponent()), PushHit.bStartPenetrating);
+		UE_LOG(LogContainerPush, Display, TEXT("Grabbed %s. Forward=%s"), *GetNameSafe(Hit.GetActor()), *ContainerForward.ToCompactString());
+	}
+}
+
+void ACompanionPlayableCharacter::MoveHeldContainer(float DeltaSeconds)
+{
+	ContainerMoveVelocity = FVector2D::ZeroVector;
+	if (DeltaSeconds <= SMALL_NUMBER || ContainerMoveInput.IsNearlyZero())
+	{
+		return;
+	}
+
+	UStaticMeshComponent* Container = HeldContainer.Get();
+	UCapsuleComponent* Capsule = GetCapsuleComponent();
+	constexpr float HoldMoveSpeed = 100.0f;
+	const FVector2D Input = ContainerMoveInput.SizeSquared() > 1.0
+		? ContainerMoveInput.GetSafeNormal() : ContainerMoveInput;
+	const FVector Right = FVector::CrossProduct(FVector::UpVector, ContainerForward);
+	const FVector Requested = (ContainerForward * Input.Y + Right * Input.X) * HoldMoveSpeed * DeltaSeconds;
+	FHitResult ContainerHit;
+	FHitResult CharacterHit;
+	const float ContainerFraction = GetAllowedMoveFraction(*Container, *Capsule, Requested, ContainerHit);
+	const float CharacterFraction = GetAllowedMoveFraction(*Capsule, *Container, Requested, CharacterHit);
+	const float Fraction = FMath::Min(ContainerFraction, CharacterFraction);
+	const FVector Delta = Requested * Fraction;
+
+	// Both sweeps have already been checked. Move both by the same delta so
+	// neither slides ahead when its partner reaches an obstacle.
+	if (!Delta.IsNearlyZero())
+	{
+		Container->AddWorldOffset(Delta);
+		AddActorWorldOffset(Delta);
+		GetCharacterMovement()->bForceNextFloorCheck = true;
+		ContainerMoveVelocity = Input * (HoldMoveSpeed * Fraction);
+	}
+	if (Fraction < 1.0f && CVarContainerPushDebug.GetValueOnGameThread() != 0)
+	{
+		const FHitResult& Block = ContainerFraction <= CharacterFraction ? ContainerHit : CharacterHit;
+		UE_LOG(LogContainerPush, Display, TEXT("%s movement blocked by %s (%s). Initial overlap=%d"),
+			ContainerFraction <= CharacterFraction ? TEXT("Container") : TEXT("Strong"),
+			*GetNameSafe(Block.GetActor()), *GetNameSafe(Block.GetComponent()), Block.bStartPenetrating);
 	}
 }

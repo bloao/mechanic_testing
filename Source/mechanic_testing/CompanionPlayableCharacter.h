@@ -10,6 +10,7 @@ class UCameraComponent;
 class UInputAction;
 class UInputMappingContext;
 class USkeletalMesh;
+class UStaticMeshComponent;
 class USpringArmComponent;
 struct FInputActionValue;
 
@@ -24,7 +25,16 @@ public:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 	virtual void PawnClientRestart() override;
 	virtual void UnPossessed() override;
+	virtual void Tick(float DeltaSeconds) override;
+	virtual void Jump() override;
 	virtual void ConfigureAgileAbilities(bool bIsAgile, int32 AgileJumpCount = 2) override;
+
+	UFUNCTION(BlueprintPure, Category = "Container")
+	bool IsHoldingContainer() const { return HeldContainer.IsValid(); }
+
+	/** Actual speed in cm/s while holding a container: X is sideways, Y is forward. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Container")
+	FVector2D ContainerMoveVelocity = FVector2D::ZeroVector;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
@@ -67,9 +77,16 @@ protected:
 	FKey PushContainerKey = EKeys::F;
 
 private:
+	TWeakObjectPtr<UStaticMeshComponent> HeldContainer;
+	FVector ContainerForward = FVector::ForwardVector;
+	FVector2D ContainerMoveInput = FVector2D::ZeroVector;
+
 	void ApplyAppearance();
 	void Move(const FInputActionValue& Value);
+	void ClearContainerMoveInput();
+	void MoveHeldContainer(float DeltaSeconds);
 	void Look(const FInputActionValue& Value);
 	void Smash();
-	void PushLargeContainer();
+	void ToggleContainerGrab();
+	void ReleaseContainer();
 };

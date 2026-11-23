@@ -29,12 +29,12 @@ meshes and animations, the shared ability base, and the existing companion contr
 - **Tab:** switch. The inactive character receives an AIController and follows.
 - **Agile (Quinn):** two jumps and wall running; cannot smash.
 - **Strong (Manny):** one jump and smash; cannot wall run.
-- **F while Strong is enlarged:** Aim the camera toward a nearby
-  `SM_ContainerClosed_Large` and press F to push it up to 2 metres away from the
-  side you are aiming at. Walk around the container to push it in another direction.
-  Blocking geometry stops the push. Try F as
-  normal-sized Strong, then grow at a terminal and try again. Once the growth
-  timer expires, F can no longer move the container.
+- **F while Strong is enlarged:** Aim the camera at a nearby
+  `SM_ContainerClosed_Large` and press F to grab or release it. While holding it,
+  W pushes, S pulls, and A/D slide it sideways without rotating it. Strong and the
+  container stop together when either is blocked. Jumping, switching characters,
+  leaving the ground, or reaching the end of the growth timer releases it.
+  The container needs query collision and physics simulation turned off.
 - **E:** Strong's prototype smash key. It does nothing as Agile. If a Blueprint
   assigns the existing Smash Input Action, bind/map that Enhanced Input action instead.
 - **E at a BP_Terminal:** Only the character you are controlling receives the
@@ -67,6 +67,19 @@ meshes and animations, the shared ability base, and the existing companion contr
   a UE 5.6 installation (the authoring machine only has UE 5.3).
 - To wall run, jump while moving close and parallel to a tall static wall. A second
   jump press while wall running pushes away. There is no ground-height restriction.
+
+## Strong's Container Animation
+
+In Manny's Animation Blueprint, read **Is Holding Container** and **Container Move
+Velocity** from the owning `CompanionPlayableCharacter`. Enter the braced state
+while holding and return to locomotion when released. Use the measured container
+velocity (X is right/left, Y is forward/backward) for the lower-body locomotion.
+Both values are zero while blocked or when the player stops moving.
+
+Use the imported push Animation Sequence for the upper body in all directions.
+Choose a frame where Manny's hands are planted and use a Sequence Evaluator for
+that pose. Layer it over the in-place locomotion from the first spine bone upward.
+Check that the clip uses Manny's skeleton, or retarget it before assigning it.
 
 ## Test a Breakable
 
