@@ -189,14 +189,19 @@ void ACompanionPlayableCharacter::PushLargeContainer()
 
 	constexpr float PushReach = 150.0f;
 	constexpr float PushDistance = 200.0f;
+	constexpr float PushAimRadius = 30.0f;
 	static const FName LargeContainerMeshName(TEXT("SM_ContainerClosed_Large"));
 
-	const FVector Direction = GetActorForwardVector().GetSafeNormal2D();
-	const FVector Start = GetActorLocation();
-	const FVector End = Start + Direction * (GetCapsuleComponent()->GetScaledCapsuleRadius() + PushReach);
+	// Looking around does not rotate the pawn until it moves. Use the same
+	// camera-relative forward direction as the movement input.
+	const FVector AimDirection = FRotator(0.0, GetControlRotation().Yaw, 0.0).Vector();
+	const UCapsuleComponent* Capsule = GetCapsuleComponent();
+	const FVector Start = GetActorLocation() - FVector::UpVector * (Capsule->GetScaledCapsuleHalfHeight() * 0.5f);
+	const FVector End = Start + AimDirection * (Capsule->GetScaledCapsuleRadius() + PushReach);
 	const FCollisionQueryParams Query(SCENE_QUERY_STAT(CompanionContainerPush), false, this);
 	FHitResult Hit;
-	if (!GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Pawn, Query))
+	if (!GetWorld()->SweepSingleByChannel(Hit, Start, End, FQuat::Identity, ECC_Pawn,
+		FCollisionShape::MakeSphere(PushAimRadius), Query))
 	{
 		return;
 	}
@@ -210,6 +215,7 @@ void ACompanionPlayableCharacter::PushLargeContainer()
 
 	// Level containers can be placed as static meshes. Move the hit component
 	// with a sweep so blocking geometry can stop the push.
+	const FVector PushDirection = -Hit.ImpactNormal.GetSafeNormal2D();
 	Container->SetMobility(EComponentMobility::Movable);
-	Container->AddWorldOffset(Direction * PushDistance, true);
+	Container->AddWorldOffset((PushDirection.IsNearlyZero() ? AimDirection : PushDirection) * PushDistance, true);
 }
