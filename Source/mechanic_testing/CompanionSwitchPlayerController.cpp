@@ -92,9 +92,8 @@ void ACompanionSwitchPlayerController::Tick(float DeltaSeconds)
 
 bool ACompanionSwitchPlayerController::TryInteractWithTerminal()
 {
-	ACompanionCharacterBase* Agile = Cast<ACompanionCharacterBase>(GetCompanionAtIndex(AgileCompanionIndex));
-	ACompanionCharacterBase* Strong = Cast<ACompanionCharacterBase>(GetCompanionAtIndex(1 - AgileCompanionIndex));
-	if (!IsValid(Agile) || !IsValid(Strong) || !GetPawn())
+	ACompanionCharacterBase* InteractingCharacter = Cast<ACompanionCharacterBase>(GetControlledCompanion());
+	if (!IsValid(InteractingCharacter) || GetPawn() != InteractingCharacter)
 	{
 		return false;
 	}
@@ -118,8 +117,9 @@ bool ACompanionSwitchPlayerController::TryInteractWithTerminal()
 		const FBoolProperty* CanInteract = FindFProperty<FBoolProperty>(Terminal->GetClass(), TEXT("canInteract"));
 		if (CanInteract && CanInteract->GetPropertyValue_InContainer(Terminal))
 		{
-			Agile->ApplyTemporarySize(AgileTerminalSizeMultiplier, TerminalSizeDuration);
-			Strong->ApplyTemporarySize(StrongTerminalSizeMultiplier, TerminalSizeDuration);
+			const bool bIsAgile = InteractingCharacter == GetCompanionAtIndex(AgileCompanionIndex);
+			InteractingCharacter->ApplyTemporarySize(
+				bIsAgile ? AgileTerminalSizeMultiplier : StrongTerminalSizeMultiplier, TerminalSizeDuration);
 			return true;
 		}
 	}

@@ -1013,11 +1013,18 @@ bool FCompanionTerminalSizeTest::RunTest(const FString& Parameters)
 	Gate->SetPropertyValue_InContainer(Terminal, true);
 	TestTrue(TEXT("The terminal's existing interaction gate enables resizing"), Controller->TryInteractWithTerminal());
 	TestTrue(TEXT("Terminal interaction shrinks Agile"), TestWorld.Character->GetActorScale3D().Equals(FVector(0.5)));
-	TestTrue(TEXT("Terminal interaction grows Strong"), Strong->GetActorScale3D().Equals(FVector(2.0)));
+	TestTrue(TEXT("Agile's interaction leaves Strong unchanged"), Strong->GetActorScale3D().Equals(FVector::OneVector));
+	TestWorld.Character->RestoreOriginalSize();
 	Controller->SwitchControlledCharacter();
 	Gate->SetPropertyValue_InContainer(Terminal, true);
 	TestTrue(TEXT("Strong can use the terminal too"), Controller->TryInteractWithTerminal());
-	TestTrue(TEXT("Switching does not swap the size roles"), Strong->GetActorScale3D().Equals(FVector(2.0))
+	TestTrue(TEXT("Strong's interaction grows only Strong"), Strong->GetActorScale3D().Equals(FVector(2.0))
+		&& TestWorld.Character->GetActorScale3D().Equals(FVector::OneVector));
+	Controller->SwitchControlledCharacter();
+	Gate->SetPropertyValue_InContainer(Terminal, true);
+	TestTrue(TEXT("Agile can activate her ability while Strong's is already active"), Controller->TryInteractWithTerminal());
+	Strong->RestoreOriginalSize();
+	TestTrue(TEXT("Restoring Strong leaves Agile's independent effect active"), Strong->GetActorScale3D().Equals(FVector::OneVector)
 		&& TestWorld.Character->GetActorScale3D().Equals(FVector(0.5)));
 	return true;
 }
