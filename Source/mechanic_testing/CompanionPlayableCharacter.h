@@ -87,6 +87,6 @@ private:
 	void MoveHeldContainer(float DeltaSeconds);
 	void Look(const FInputActionValue& Value);
 	void Smash();
-	void ToggleContainerGrab();
+	void TryGrabContainer();
 	void ReleaseContainer();
 };

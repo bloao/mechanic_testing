@@ -30,8 +30,9 @@ meshes and animations, the shared ability base, and the existing companion contr
 - **Agile (Quinn):** two jumps and wall running; cannot smash.
 - **Strong (Manny):** one jump and smash; cannot wall run.
 - **F while Strong is enlarged:** Aim the camera at a nearby
-  `SM_ContainerClosed_Large` and press F to grab or release it. While holding it,
-  W pushes, S pulls, and A/D slide it sideways without rotating it. Strong and the
+  `SM_ContainerClosed_Large` and hold F to grab it. While holding F, W pushes,
+  S pulls, and A/D slide it sideways without rotating it. Let go of F to release
+  the container. Strong and the
   container stop together when either is blocked. Jumping, switching characters,
   leaving the ground, or reaching the end of the growth timer releases it.
   The container needs query collision and physics simulation turned off.

@@ -137,7 +137,8 @@ void ACompanionPlayableCharacter::ApplyAppearance()
 void ACompanionPlayableCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
-	PlayerInputComponent->BindKey(PushContainerKey, IE_Pressed, this, &ACompanionPlayableCharacter::ToggleContainerGrab);
+	PlayerInputComponent->BindKey(PushContainerKey, IE_Pressed, this, &ACompanionPlayableCharacter::TryGrabContainer);
+	PlayerInputComponent->BindKey(PushContainerKey, IE_Released, this, &ACompanionPlayableCharacter::ReleaseContainer);
 	UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent);
 	UInputAction* LoadedMove = MoveAction.LoadSynchronous();
 	UInputAction* LoadedJump = JumpAction.LoadSynchronous();
@@ -256,11 +257,10 @@ void ACompanionPlayableCharacter::Smash()
 	PerformSmash();
 }
 
-void ACompanionPlayableCharacter::ToggleContainerGrab()
+void ACompanionPlayableCharacter::TryGrabContainer()
 {
 	if (IsHoldingContainer())
 	{
-		ReleaseContainer();
 		return;
 	}
 	const bool bDebug = CVarContainerPushDebug.GetValueOnGameThread() != 0;
