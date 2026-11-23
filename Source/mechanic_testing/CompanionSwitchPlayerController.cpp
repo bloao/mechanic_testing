@@ -19,6 +19,7 @@
 #include "Navigation/PathFollowingComponent.h"
 #include "NavigationSystem.h"
 #include "UObject/ConstructorHelpers.h"
+#include "UObject/UnrealType.h"
 
 static TAutoConsoleVariable<int32> CVarCompanionFollowDebug(
 	TEXT("companion.Follow.Debug"), 0,
@@ -76,12 +77,53 @@ void ACompanionSwitchPlayerController::Tick(float DeltaSeconds)
 		SwitchControlledCharacter();
 	}
 
+	if (WasInputKeyJustPressed(TerminalInteractionKey))
+	{
+		TryInteractWithTerminal();
+	}
+
 	TimeSinceLastFollowUpdate += DeltaSeconds;
 	if (TimeSinceLastFollowUpdate >= FollowRefreshInterval)
 	{
 		TimeSinceLastFollowUpdate = 0.0f;
 		UpdateFollowerMove();
 	}
+}
+
+bool ACompanionSwitchPlayerController::TryInteractWithTerminal()
+{
+	ACompanionCharacterBase* Agile = Cast<ACompanionCharacterBase>(GetCompanionAtIndex(AgileCompanionIndex));
+	ACompanionCharacterBase* Strong = Cast<ACompanionCharacterBase>(GetCompanionAtIndex(1 - AgileCompanionIndex));
+	if (!IsValid(Agile) || !IsValid(Strong) || !GetPawn())
+	{
+		return false;
+	}
+
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		AActor* Terminal = *It;
+		bool bIsTerminal = false;
+		for (const UClass* Class = Terminal->GetClass(); Class; Class = Class->GetSuperClass())
+		{
+			if (Class->GetPathName() == TEXT("/Game/Blueprints/BP_Terminal.BP_Terminal_C"))
+			{
+				bIsTerminal = true;
+				break;
+			}
+		}
+		if (!bIsTerminal) continue;
+
+		// The existing Blueprint sets this from its player overlap and checks it
+		// on E. Reuse that gate while leaving its container interaction untouched.
+		const FBoolProperty* CanInteract = FindFProperty<FBoolProperty>(Terminal->GetClass(), TEXT("canInteract"));
+		if (CanInteract && CanInteract->GetPropertyValue_InContainer(Terminal))
+		{
+			Agile->ApplyTemporarySize(AgileTerminalSizeMultiplier, TerminalSizeDuration);
+			Strong->ApplyTemporarySize(StrongTerminalSizeMultiplier, TerminalSizeDuration);
+			return true;
+		}
+	}
+	return false;
 }
 
 void ACompanionSwitchPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)

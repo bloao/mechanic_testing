@@ -31,6 +31,24 @@ meshes and animations, the shared ability base, and the existing companion contr
 - **Strong (Manny):** one jump and smash; cannot wall run.
 - **E:** Strong's prototype smash key. It does nothing as Agile. If a Blueprint
   assigns the existing Smash Input Action, bind/map that Enhanced Input action instead.
+- **E at a BP_Terminal:** Strong instantly becomes twice his original size and
+  Agile becomes half her original size for 20 seconds. Both then return to their
+  original sizes. Using any terminal again refreshes the 20 seconds without stacking
+  the scale changes. Switching characters does not cancel the effect.
+  This uses the existing terminal Blueprint's `canInteract` gate and E key;
+  its existing container interaction remains connected. No Blueprint rewiring is needed.
+  The shared controller exposes the size multipliers and duration under
+  **Companion > Terminal**. Rebuild the native module in UE 5.6 before testing.
+
+  In UE 5.6's Automation window, run
+  `MechanicTesting.Companions.TemporarySize` and
+  `MechanicTesting.Companions.TerminalSizeInteraction`. These cover the existing
+  terminal gate, both character roles, timer refresh, restoration of custom original
+  scales, feet height, and character switching. The terminal test requires the
+  project's Blueprint assets to be downloaded with Git LFS.
+  The size implementation has been checked against the UE 5.6 API and build
+  settings; the new automation tests and Play behavior still need verification in
+  a UE 5.6 installation (the authoring machine only has UE 5.3).
 - To wall run, jump while moving close and parallel to a tall static wall. A second
   jump press while wall running pushes away. There is no ground-height restriction.
 
