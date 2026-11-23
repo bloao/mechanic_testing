@@ -63,9 +63,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	FKey SmashKey;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	FKey PushContainerKey = EKeys::F;
+
 private:
 	void ApplyAppearance();
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
 	void Smash();
+	void PushLargeContainer();
 };

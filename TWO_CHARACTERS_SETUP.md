@@ -29,6 +29,10 @@ meshes and animations, the shared ability base, and the existing companion contr
 - **Tab:** switch. The inactive character receives an AIController and follows.
 - **Agile (Quinn):** two jumps and wall running; cannot smash.
 - **Strong (Manny):** one jump and smash; cannot wall run.
+- **F while Strong is enlarged:** Face a nearby `SM_ContainerClosed_Large` and
+  press F to push it up to 2 metres. Blocking geometry stops the push. Try F as
+  normal-sized Strong, then grow at a terminal and try again. Once the growth
+  timer expires, F can no longer move the container.
 - **E:** Strong's prototype smash key. It does nothing as Agile. If a Blueprint
   assigns the existing Smash Input Action, bind/map that Enhanced Input action instead.
 - **E at a BP_Terminal:** Only the character you are controlling receives the

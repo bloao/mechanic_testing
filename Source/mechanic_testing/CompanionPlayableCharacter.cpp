@@ -3,11 +3,14 @@
 #include "AIController.h"
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
+#include "CollisionQueryParams.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/SkeletalMesh.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -97,6 +100,7 @@ void ACompanionPlayableCharacter::ApplyAppearance()
 void ACompanionPlayableCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
+	PlayerInputComponent->BindKey(PushContainerKey, IE_Pressed, this, &ACompanionPlayableCharacter::PushLargeContainer);
 	UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent);
 	UInputAction* LoadedMove = MoveAction.LoadSynchronous();
 	UInputAction* LoadedJump = JumpAction.LoadSynchronous();
@@ -174,4 +178,38 @@ void ACompanionPlayableCharacter::Look(const FInputActionValue& Value)
 void ACompanionPlayableCharacter::Smash()
 {
 	PerformSmash();
+}
+
+void ACompanionPlayableCharacter::PushLargeContainer()
+{
+	if (!bCanSmash || !HasTemporaryGrowth())
+	{
+		return;
+	}
+
+	constexpr float PushReach = 150.0f;
+	constexpr float PushDistance = 200.0f;
+	static const FName LargeContainerMeshName(TEXT("SM_ContainerClosed_Large"));
+
+	const FVector Direction = GetActorForwardVector().GetSafeNormal2D();
+	const FVector Start = GetActorLocation();
+	const FVector End = Start + Direction * (GetCapsuleComponent()->GetScaledCapsuleRadius() + PushReach);
+	const FCollisionQueryParams Query(SCENE_QUERY_STAT(CompanionContainerPush), false, this);
+	FHitResult Hit;
+	if (!GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Pawn, Query))
+	{
+		return;
+	}
+
+	UStaticMeshComponent* Container = Cast<UStaticMeshComponent>(Hit.GetComponent());
+	if (!Container || !Container->GetStaticMesh()
+		|| Container->GetStaticMesh()->GetFName() != LargeContainerMeshName)
+	{
+		return;
+	}
+
+	// Level containers can be placed as static meshes. Move the hit component
+	// with a sweep so blocking geometry can stop the push.
+	Container->SetMobility(EComponentMobility::Movable);
+	Container->AddWorldOffset(Direction * PushDistance, true);
 }

@@ -39,6 +39,8 @@ public:
 	bool CanPerformSmash() const;
 
 protected:
+	bool HasTemporaryGrowth() const;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Abilities|Jump")
 	bool bCanDoubleJump;
 

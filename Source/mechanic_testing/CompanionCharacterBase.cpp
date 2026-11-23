@@ -61,6 +61,11 @@ void ACompanionCharacterBase::RestoreOriginalSize()
 	}
 }
 
+bool ACompanionCharacterBase::HasTemporaryGrowth() const
+{
+	return bHasTemporarySize && GetActorScale3D().GetAbsMax() > OriginalActorScale.GetAbsMax();
+}
+
 void ACompanionCharacterBase::SetSizeKeepingFeetPosition(const FVector& NewScale)
 {
 	const float PreviousHalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
