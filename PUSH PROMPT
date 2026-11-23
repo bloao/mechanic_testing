@@ -1,4 +1,4 @@
-git switch mechanics
-git status --short
-git commit -m "Describe what you changed"
-git push origin mechanics
+git diff --cached --name-status
+git commit -m "Add Strong's container grab animation"
+git pull --rebase --autostash origin mechanics
+git push origin mechanic
