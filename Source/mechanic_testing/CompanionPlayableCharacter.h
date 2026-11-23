@@ -32,7 +32,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Container")
 	bool IsHoldingContainer() const { return HeldContainer.IsValid(); }
 
-	/** Actual speed in cm/s while holding a container: X is sideways, Y is forward. */
+	/** Actual speed in cm/s while holding a container. X is always zero, Y is signed forward speed. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Container")
 	FVector2D ContainerMoveVelocity = FVector2D::ZeroVector;
 
@@ -79,7 +79,7 @@ protected:
 private:
 	TWeakObjectPtr<UStaticMeshComponent> HeldContainer;
 	FVector ContainerForward = FVector::ForwardVector;
-	FVector2D ContainerMoveInput = FVector2D::ZeroVector;
+	double ContainerForwardInput = 0.0;
 
 	void ApplyAppearance();
 	void Move(const FInputActionValue& Value);

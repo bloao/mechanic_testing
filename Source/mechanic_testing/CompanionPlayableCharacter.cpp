@@ -203,7 +203,7 @@ void ACompanionPlayableCharacter::Move(const FInputActionValue& Value)
 	const FVector2D Input = Value.Get<FVector2D>();
 	if (IsHoldingContainer())
 	{
-		ContainerMoveInput = Input;
+		ContainerForwardInput = FMath::Clamp(Input.Y, -1.0, 1.0);
 		return;
 	}
 	if (GetController())
@@ -216,7 +216,7 @@ void ACompanionPlayableCharacter::Move(const FInputActionValue& Value)
 
 void ACompanionPlayableCharacter::ClearContainerMoveInput()
 {
-	ContainerMoveInput = FVector2D::ZeroVector;
+	ContainerForwardInput = 0.0;
 }
 
 void ACompanionPlayableCharacter::Tick(float DeltaSeconds)
@@ -335,7 +335,7 @@ void ACompanionPlayableCharacter::TryGrabContainer()
 void ACompanionPlayableCharacter::MoveHeldContainer(float DeltaSeconds)
 {
 	ContainerMoveVelocity = FVector2D::ZeroVector;
-	if (DeltaSeconds <= SMALL_NUMBER || ContainerMoveInput.IsNearlyZero())
+	if (DeltaSeconds <= SMALL_NUMBER || FMath::IsNearlyZero(ContainerForwardInput))
 	{
 		return;
 	}
@@ -343,10 +343,8 @@ void ACompanionPlayableCharacter::MoveHeldContainer(float DeltaSeconds)
 	UStaticMeshComponent* Container = HeldContainer.Get();
 	UCapsuleComponent* Capsule = GetCapsuleComponent();
 	constexpr float HoldMoveSpeed = 100.0f;
-	const FVector2D Input = ContainerMoveInput.SizeSquared() > 1.0
-		? ContainerMoveInput.GetSafeNormal() : ContainerMoveInput;
-	const FVector Right = FVector::CrossProduct(FVector::UpVector, ContainerForward);
-	const FVector Requested = (ContainerForward * Input.Y + Right * Input.X) * HoldMoveSpeed * DeltaSeconds;
+	const double ForwardSpeed = ContainerForwardInput * HoldMoveSpeed;
+	const FVector Requested = ContainerForward * ForwardSpeed * DeltaSeconds;
 	FHitResult ContainerHit;
 	FHitResult CharacterHit;
 	const float ContainerFraction = GetAllowedMoveFraction(*Container, *Capsule, Requested, ContainerHit);
@@ -361,7 +359,7 @@ void ACompanionPlayableCharacter::MoveHeldContainer(float DeltaSeconds)
 		Container->AddWorldOffset(Delta);
 		AddActorWorldOffset(Delta);
 		GetCharacterMovement()->bForceNextFloorCheck = true;
-		ContainerMoveVelocity = Input * (HoldMoveSpeed * Fraction);
+		ContainerMoveVelocity.Y = ForwardSpeed * Fraction;
 	}
 	if (Fraction < 1.0f && CVarContainerPushDebug.GetValueOnGameThread() != 0)
 	{

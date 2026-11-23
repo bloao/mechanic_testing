@@ -30,10 +30,10 @@ meshes and animations, the shared ability base, and the existing companion contr
 - **Agile (Quinn):** two jumps and wall running; cannot smash.
 - **Strong (Manny):** one jump and smash; cannot wall run.
 - **F while Strong is enlarged:** Aim the camera at a nearby
-  `SM_ContainerClosed_Large` and hold F to grab it. While holding F, W pushes,
-  S pulls, and A/D slide it sideways without rotating it. Let go of F to release
-  the container. Strong and the
-  container stop together when either is blocked. Jumping, switching characters,
+  `SM_ContainerClosed_Large` and hold F to grab it. While holding F, W pushes and
+  S pulls. To move it along the other axis, release F, walk to another side, and
+  grab it again. Strong and the container stop together when either is blocked.
+  Jumping, switching characters,
   leaving the ground, or reaching the end of the growth timer releases it.
   The container needs query collision and physics simulation turned off.
 - **E:** Strong's prototype smash key. It does nothing as Agile. If a Blueprint
@@ -74,8 +74,10 @@ meshes and animations, the shared ability base, and the existing companion contr
 In Manny's Animation Blueprint, read **Is Holding Container** and **Container Move
 Velocity** from the owning `CompanionPlayableCharacter`. Enter the braced state
 while holding and return to locomotion when released. Use the measured container
-velocity (X is right/left, Y is forward/backward) for the lower-body locomotion.
-Both values are zero while blocked or when the player stops moving.
+velocity's Y value for the lower-body locomotion. Use a 1D Blend Space with
+backward walk at -100, idle at 0, and forward walk at +100. If you already made
+a 2D Blend Space, its X input stays at zero. The speed is zero when blocked or
+when the player stops moving.
 
 Use the imported push Animation Sequence for the upper body in all directions.
 Choose a frame where Manny's hands are planted and use a Sequence Evaluator for
