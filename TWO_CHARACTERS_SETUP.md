@@ -42,6 +42,14 @@ meshes and animations, the shared ability base, and the existing companion contr
   The shared controller exposes the size multipliers and duration under
   **Companion > Terminal**. Rebuild the native module in UE 5.6 before testing.
 
+  If both characters still resize, close Unreal Editor, pull the latest `mechanics`
+  branch, rebuild the Editor target from that checkout, then reopen that same
+  `mechanic_testing.uproject`. In Play, filter the Output Log for
+  `LogCompanionTerminal`. The startup line should say
+  `Terminal sizing mode: interacting character only.` A single use by Agile should
+  log one activation for Agile at `0.50x`. The startup line confirms which code
+  the editor loaded.
+
   In UE 5.6's Automation window, run
   `MechanicTesting.Companions.TemporarySize` and
   `MechanicTesting.Companions.TerminalSizeInteraction`. These cover the existing

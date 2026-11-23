@@ -25,6 +25,8 @@ static TAutoConsoleVariable<int32> CVarCompanionFollowDebug(
 	TEXT("companion.Follow.Debug"), 0,
 	TEXT("Log follower route status and missing navigation connections (0/1)."));
 
+DEFINE_LOG_CATEGORY_STATIC(LogCompanionTerminal, Log, All);
+
 ACompanionSwitchPlayerController::ACompanionSwitchPlayerController()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -50,6 +52,7 @@ ACompanionSwitchPlayerController::ACompanionSwitchPlayerController()
 void ACompanionSwitchPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	UE_LOG(LogCompanionTerminal, Display, TEXT("Terminal sizing mode: interacting character only."));
 
 	// The native GameMode owns spawning and explicit role assignment. Discovering
 	// placed template pawns here can replace that pair during level startup.
@@ -118,8 +121,11 @@ bool ACompanionSwitchPlayerController::TryInteractWithTerminal()
 		if (CanInteract && CanInteract->GetPropertyValue_InContainer(Terminal))
 		{
 			const bool bIsAgile = InteractingCharacter == GetCompanionAtIndex(AgileCompanionIndex);
-			InteractingCharacter->ApplyTemporarySize(
-				bIsAgile ? AgileTerminalSizeMultiplier : StrongTerminalSizeMultiplier, TerminalSizeDuration);
+			const float SizeMultiplier = bIsAgile ? AgileTerminalSizeMultiplier : StrongTerminalSizeMultiplier;
+			UE_LOG(LogCompanionTerminal, Display, TEXT("%s (%s) used %s: applying %.2fx size for %.1f seconds."),
+				*GetNameSafe(InteractingCharacter), bIsAgile ? TEXT("Agile") : TEXT("Strong"),
+				*GetNameSafe(Terminal), SizeMultiplier, TerminalSizeDuration);
+			InteractingCharacter->ApplyTemporarySize(SizeMultiplier, TerminalSizeDuration);
 			return true;
 		}
 	}
