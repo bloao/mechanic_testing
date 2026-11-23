@@ -1,4 +1,6 @@
-git pull --ff-only origin main
+git fetch origin
+git switch mechanics
+git pull origin mechanics
 
 $ProjectFile = Join-Path (Get-Location).Path "mechanic_testing.uproject"
 
