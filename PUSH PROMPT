@@ -1,2 +1,4 @@
+git switch mechanics
+git status --short
 git commit -m "Describe what you changed"
 git push origin mechanics
