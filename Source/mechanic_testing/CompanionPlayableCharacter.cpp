@@ -17,9 +17,15 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "HAL/IConsoleManager.h"
 #include "InputAction.h"
 #include "InputActionValue.h"
 #include "InputMappingContext.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogContainerPush, Log, All);
+
+static TAutoConsoleVariable<int32> CVarContainerPushDebug(
+	TEXT("companion.ContainerPush.Debug"), 0, TEXT("Log targeting and collision for each container push."));
 
 ACompanionPlayableCharacter::ACompanionPlayableCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -182,8 +188,15 @@ void ACompanionPlayableCharacter::Smash()
 
 void ACompanionPlayableCharacter::PushLargeContainer()
 {
-	if (!bCanSmash || !HasTemporaryGrowth())
+	const bool bDebug = CVarContainerPushDebug.GetValueOnGameThread() != 0;
+	const bool bHasGrowth = HasTemporaryGrowth();
+	if (!bCanSmash || !bHasGrowth)
 	{
+		if (bDebug)
+		{
+			UE_LOG(LogContainerPush, Display, TEXT("Rejected %s: Strong=%d, growth active=%d."),
+				*GetName(), bCanSmash, bHasGrowth);
+		}
 		return;
 	}
 
@@ -203,13 +216,23 @@ void ACompanionPlayableCharacter::PushLargeContainer()
 	if (!GetWorld()->SweepSingleByChannel(Hit, Start, End, FQuat::Identity, ECC_Pawn,
 		FCollisionShape::MakeSphere(PushAimRadius), Query))
 	{
+		if (bDebug)
+		{
+			UE_LOG(LogContainerPush, Display, TEXT("Aim missed. Start=%s End=%s"),
+				*Start.ToCompactString(), *End.ToCompactString());
+		}
 		return;
 	}
 
 	UStaticMeshComponent* Container = Cast<UStaticMeshComponent>(Hit.GetComponent());
-	if (!Container || !Container->GetStaticMesh()
-		|| Container->GetStaticMesh()->GetFName() != LargeContainerMeshName)
+	const UStaticMesh* HitMesh = Container ? Container->GetStaticMesh() : nullptr;
+	if (!HitMesh || HitMesh->GetFName() != LargeContainerMeshName)
 	{
+		if (bDebug)
+		{
+			UE_LOG(LogContainerPush, Display, TEXT("Aim hit a different target. Actor=%s Component=%s Mesh=%s"),
+				*GetNameSafe(Hit.GetActor()), *GetNameSafe(Hit.GetComponent()), *GetNameSafe(HitMesh));
+		}
 		return;
 	}
 
@@ -217,5 +240,17 @@ void ACompanionPlayableCharacter::PushLargeContainer()
 	// with a sweep so blocking geometry can stop the push.
 	const FVector PushDirection = -Hit.ImpactNormal.GetSafeNormal2D();
 	Container->SetMobility(EComponentMobility::Movable);
-	Container->AddWorldOffset((PushDirection.IsNearlyZero() ? AimDirection : PushDirection) * PushDistance, true);
+	const FVector RequestedDelta = (PushDirection.IsNearlyZero() ? AimDirection : PushDirection) * PushDistance;
+	const FVector BeforePush = Container->GetComponentLocation();
+	FHitResult PushHit;
+	Container->AddWorldOffset(RequestedDelta, true, bDebug ? &PushHit : nullptr);
+	if (bDebug)
+	{
+		const FVector ActualDelta = Container->GetComponentLocation() - BeforePush;
+		UE_LOG(LogContainerPush, Display,
+			TEXT("Target=%s Requested=%s Actual=%s AimNormal=%s AimStartedOverlapping=%d Blocked=%d Blocker=%s BlockerComponent=%s PushStartedOverlapping=%d"),
+			*GetNameSafe(Hit.GetActor()), *RequestedDelta.ToCompactString(), *ActualDelta.ToCompactString(),
+			*Hit.ImpactNormal.ToCompactString(), Hit.bStartPenetrating, PushHit.bBlockingHit,
+			*GetNameSafe(PushHit.GetActor()), *GetNameSafe(PushHit.GetComponent()), PushHit.bStartPenetrating);
+	}
 }
