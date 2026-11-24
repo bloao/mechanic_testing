@@ -1,1 +1,3 @@
-C:\Users\hsramin3\mechanic_testing-fresh\Saved\Autosaves\Game\Characters\Mannequins\Animations
+git switch -c "mechanics-upload-$(Get-Date -Format yyyyMMdd-HHmmss)"
+git add -A
+git diff --cached --name-status
