@@ -1,4 +1,4 @@
-$asset = "Content/Characters/Mannequins/Animations/ABP_Manny.uasset"
-Copy-Item $asset "..\ABP_Manny-before-recovery.uasset"
-git restore --source=78ddccc --worktree -- $asset
-git status --short -- $asset
+$commit = "d63223f"
+git switch --detach --discard-changes $commit
+git lfs pull origin
+git log -1 --oneline
