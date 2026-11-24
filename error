@@ -1,5 +1,5 @@
-git switch mechanics
-git fetch origin
-git reset --hard d63223f
-git lfs pull origin
-git log -1 --oneline
+git stash list
+git log --all --reflog --oneline -- "Content/Characters/Mannequins/Animations/ABP_Manny.uasset"
+Get-ChildItem .\Saved -Recurse -File -Filter "ABP_Manny*.uasset" |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object LastWriteTime, FullName
