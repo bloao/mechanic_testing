@@ -1,4 +1,1 @@
-$commit = "d63223f"
-git switch --detach --discard-changes $commit
-git lfs pull origin
-git log -1 --oneline
+C:\Users\hsramin3\mechanic_testing-fresh\Saved\Autosaves\Game\Characters\Mannequins\Animations
