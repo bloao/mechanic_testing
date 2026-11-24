@@ -1,5 +1,20 @@
-git commit -m "Add Strong's container animation"
-git pull --rebase --autostash origin mechanics
+PS C:\Users\hsramin3\mechanic_testing-fresh> & "C:\Program Files\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat" mechanic_testingEditor Win64 Development "-Project=$ProjectFile" -WaitMutex -NoEngineChanges -NoHotReloadFromIDE -NoUBA -NoUBALocal
+Using bundled DotNet SDK version: 8.0.300 win-x64
+Running UnrealBuildTool: dotnet "..\..\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.dll" mechanic_testingEditor Win64 Development -Project= -WaitMutex -NoEngineChanges -NoHotReloadFromIDE -NoUBA -NoUBALocal
+Unhandled exception: ArgumentException: The path is empty. (Parameter 'path')
+   at System.IO.Path.GetFullPath(String path)
+   at EpicGames.Core.FileReference..ctor(String inPath)
+   at EpicGames.Core.CommandLineArguments.TryGetValue(String prefix, FileReference& value)Wrapped by CommandLineArgumentException: The argument '-Project=' does not specify a valid file name
+   at EpicGames.Core.CommandLineArguments.TryGetValue(String prefix, FileReference& value)
+   at EpicGames.Core.CommandLineArguments.GetFileReferenceOrDefault(String prefix, FileReference defaultValue)
+   at UnrealBuildTool.TargetDescriptor.ParseSingleCommandLine(CommandLineArguments Arguments, Boolean bUsePrecompiled, Boolean bSkipRulesCompile, Boolean bForceRulesCompile, Boolean bCreateSimplifiedDescriptors, List`1 TargetDescriptors, ILogger Logger)
+   at UnrealBuildTool.TargetDescriptor.ParseCommandLine(CommandLineArguments Arguments, Boolean bUsePrecompiled, Boolean bSkipRulesCompile, Boolean bForceRulesCompile, Boolean bCreateSimplifiedDescriptors, List`1 TargetDescriptors, ILogger Logger)
+   at UnrealBuildTool.TargetDescriptor.ParseCommandLineForProjects(CommandLineArguments Arguments, ILogger Logger)
+   at UnrealBuildTool.UEBuildPlatform.InitializePerPlatformSDKs(String[] Args, Boolean bArgumentsAreForUBT, ILogger Logger)
+   at UnrealBuildTool.UEBuildPlatform.RegisterPlatforms(Boolean bIncludeNonInstalledPlatforms, Boolean bHostPlatformOnly, String[] ArgumentsForPerPlatform, Boolean bArgumentsAreForUBT, ILogger Logger)
+   at UnrealBuildTool.UEBuildPlatform.RegisterPlatforms(Boolean bIncludeNonInstalledPlatforms, Boolean bHostPlatformOnly, Type UBTModeType, String[] ArgumentsForPerPlatform, ILogger Logger)
+   at UnrealBuildTool.UnrealBuildTool.Main(String[] ArgumentsArray)
 
-
-git push origin HEAD:mechanics
+Result: Failed (OtherCompilationError)
+Total execution time: 0.25 seconds
+PS C:\Users\hsramin3\mechanic_testing-fresh>
