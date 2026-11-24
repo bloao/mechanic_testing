@@ -39,7 +39,7 @@ meshes and animations, the shared ability base, and the existing companion contr
 - **E:** Strong's prototype smash key. It does nothing as Agile. If a Blueprint
   assigns the existing Smash Input Action, bind/map that Enhanced Input action instead.
 - **E at a BP_Terminal:** Only the character you are controlling receives the
-  effect: Strong instantly becomes twice his original size, or Agile becomes half
+  effect: Strong instantly grows to 125% of his original size, or Agile becomes half
   her original size, for 20 seconds before returning to normal. The other character's
   size and timer are unaffected. Using any terminal again refreshes only the
   interacting character's 20 seconds without stacking the scale changes.

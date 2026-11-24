@@ -49,7 +49,7 @@ protected:
 	float TerminalSizeDuration = 20.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Companion|Terminal", meta = (ClampMin = "0.01"))
-	float StrongTerminalSizeMultiplier = 2.0f;
+	float StrongTerminalSizeMultiplier = 1.25f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Companion|Terminal", meta = (ClampMin = "0.01"))
 	float AgileTerminalSizeMultiplier = 0.5f;

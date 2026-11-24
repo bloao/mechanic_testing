@@ -1018,7 +1018,7 @@ bool FCompanionTerminalSizeTest::RunTest(const FString& Parameters)
 	Controller->SwitchControlledCharacter();
 	Gate->SetPropertyValue_InContainer(Terminal, true);
 	TestTrue(TEXT("Strong can use the terminal too"), Controller->TryInteractWithTerminal());
-	TestTrue(TEXT("Strong's interaction grows only Strong"), Strong->GetActorScale3D().Equals(FVector(2.0))
+	TestTrue(TEXT("Strong's interaction grows only Strong to 125% scale"), Strong->GetActorScale3D().Equals(FVector(1.25))
 		&& TestWorld.Character->GetActorScale3D().Equals(FVector::OneVector));
 	Controller->SwitchControlledCharacter();
 	Gate->SetPropertyValue_InContainer(Terminal, true);
