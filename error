@@ -1,18 +1,4 @@
-PS C:\Users\hsramin3\mechanic_testing-fresh> git stash list
-stash@{0}: autostash
-PS C:\Users\hsramin3\mechanic_testing-fresh> git log --all --reflog --oneline -- "Content/Characters/Mannequins/Animations/ABP_Manny.uasset"
-78ddccc (refs/stash) On mechanics: autostash
-07b8b23 construction lvl changes
-eb119a8 Initial Unreal companion prototype
-PS C:\Users\hsramin3\mechanic_testing-fresh> Get-ChildItem .\Saved -Recurse -File -Filter "ABP_Manny*.uasset" |
->>     Sort-Object LastWriteTime -Descending |
->>     Select-Object LastWriteTime, FullName
-
-LastWriteTime       FullName
--------------       --------
-23/11/2026 18:47:19 C:\Users\hsramin3\mechanic_testing-fresh\Saved\Autosaves\Game\Characters\Mannequins\Animations\A...
-23/11/2026 18:33:20 C:\Users\hsramin3\mechanic_testing-fresh\Saved\Autosaves\Game\Characters\Mannequins\Animations\A...
-23/11/2026 18:23:09 C:\Users\hsramin3\mechanic_testing-fresh\Saved\Autosaves\Game\Characters\Mannequins\Animations\A...
-
-
-PS C:\Users\hsramin3\mechanic_testing-fresh>
+$asset = "Content/Characters/Mannequins/Animations/ABP_Manny.uasset"
+Copy-Item $asset "..\ABP_Manny-before-recovery.uasset"
+git restore --source=78ddccc --worktree -- $asset
+git status --short -- $asset
