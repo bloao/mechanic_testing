@@ -1,32 +1,5 @@
-PS C:\Users\hsramin3\mechanic_testing-fresh> git status --short
- M Content/Characters/Mannequins/Animations/ABP_Manny.uasset
- M Content/ThirdPerson/LVL_level2.umap
- M mechanic_testing.uproject
-?? Content/FreeSampleAnimationSet/
-PS C:\Users\hsramin3\mechanic_testing-fresh> git commit -m "Describe what you changed"
-On branch mechanics
-Your branch is up to date with 'origin/mechanics'.
-
-Changes not staged for commit:
-  (use "git add <file>..." to update what will be committed)
-  (use "git restore <file>..." to discard changes in working directory)
-        modified:   Content/Characters/Mannequins/Animations/ABP_Manny.uasset
-        modified:   Content/ThirdPerson/LVL_level2.umap
-        modified:   mechanic_testing.uproject
-
-Untracked files:
-  (use "git add <file>..." to include in what will be committed)
-        Content/FreeSampleAnimationSet/
-
-no changes added to commit (use "git add" and/or "git commit -a")
-PS C:\Users\hsramin3\mechanic_testing-fresh> git push origin mechanics
-To https://github.com/bloao/mechanic_testing.git
- ! [rejected]        mechanics -> mechanics (fetch first)
-error: failed to push some refs to 'https://github.com/bloao/mechanic_testing.git'
-hint: Updates were rejected because the remote contains work that you do not
-hint: have locally. This is usually caused by another repository pushing to
-hint: the same ref. If you want to integrate the remote changes, use
-hint: 'git pull' before pushing again.
-hint: See the 'Note about fast-forwards' in 'git push --help' for details.
-PS C:\Users\hsramin3\mechanic_testing-fresh>
-PS C:\Users\hsramin3\mechanic_testing-fresh>
+git switch mechanics
+git fetch origin
+git reset --hard d63223f
+git lfs pull origin
+git log -1 --oneline
