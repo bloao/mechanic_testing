@@ -1,3 +1,2 @@
-git switch -c "mechanics-upload-$(Get-Date -Format yyyyMMdd-HHmmss)"
-git add -A
-git diff --cached --name-status
+git commit -m "Add Strong's container animation"
+git pull --rebase --autostash origin mechanics
