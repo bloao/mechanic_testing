@@ -1020,6 +1020,13 @@ bool FCompanionTerminalSizeTest::RunTest(const FString& Parameters)
 		FVector(500.0, 0.0, 500.0), FRotator::ZeroRotator);
 	if (!TestNotNull(TEXT("The companion spawns"), Strong) || !TestNotNull(TEXT("The controller spawns"), Controller)) return false;
 	Controller->SetCompanionPair(TestWorld.Character, Strong);
+	Gate->SetPropertyValue_InContainer(Terminal, true);
+	TestFalse(TEXT("An ordinary BP_Terminal cannot activate ScalX even when interactable"), Controller->TryInteractWithTerminal());
+	TestTrue(TEXT("An ordinary terminal leaves both characters at normal size"),
+		TestWorld.Character->GetActorScale3D().Equals(FVector::OneVector)
+		&& Strong->GetActorScale3D().Equals(FVector::OneVector));
+
+	Terminal->Tags.Add(TEXT("ScalXTerminal"));
 	Gate->SetPropertyValue_InContainer(Terminal, false);
 	TestFalse(TEXT("E cannot activate a terminal outside its interaction gate"), Controller->TryInteractWithTerminal());
 	TestTrue(TEXT("A gated terminal leaves Agile's size unchanged"), TestWorld.Character->GetActorScale3D().Equals(FVector::OneVector));
@@ -1039,6 +1046,20 @@ bool FCompanionTerminalSizeTest::RunTest(const FString& Parameters)
 	Strong->RestoreOriginalSize();
 	TestTrue(TEXT("Restoring Strong leaves Agile's independent effect active"), Strong->GetActorScale3D().Equals(FVector::OneVector)
 		&& TestWorld.Character->GetActorScale3D().Equals(FVector(0.5)));
+
+	TestWorld.Character->RestoreOriginalSize();
+	Gate->SetPropertyValue_InContainer(Terminal, false);
+	UBoxComponent* GrowTerminal = TestWorld.AddBox(TestWorld.Character->GetActorLocation() + FVector(90.0, 0.0, 0.0), FVector(20.0));
+	TestFalse(TEXT("An unmarked prop cannot activate ScalX"), Controller->TryInteractWithTerminal());
+	GrowTerminal->GetOwner()->Tags.Add(TEXT("ScalXTerminal"));
+	GrowTerminal->SetMobility(EComponentMobility::Movable);
+	const FVector Nearby = GrowTerminal->GetComponentLocation();
+	GrowTerminal->SetWorldLocation(Nearby + FVector(500.0, 0.0, 0.0));
+	TestFalse(TEXT("A tagged terminal outside reach cannot activate ScalX"), Controller->TryInteractWithTerminal());
+	GrowTerminal->SetWorldLocation(Nearby);
+	TestTrue(TEXT("A nearby tagged terminal activates ScalX without a Blueprint gate"), Controller->TryInteractWithTerminal());
+	TestTrue(TEXT("The tagged terminal affects only the controlled character"), TestWorld.Character->GetActorScale3D().Equals(FVector(0.5))
+		&& Strong->GetActorScale3D().Equals(FVector::OneVector));
 	return true;
 }
 #endif
