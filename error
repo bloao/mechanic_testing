@@ -1,5 +1,9 @@
 git fetch origin main
-git worktree add --detach ..\mechanic_testing-main-check FETCH_HEAD
-cd ..\mechanic_testing-main-check
+if ($LASTEXITCODE -ne 0) { throw "Fetch failed. Stopped before overwriting files." }
+
+git switch --discard-changes -C main FETCH_HEAD
+if ($LASTEXITCODE -ne 0) { throw "Switch failed. Check the Git output above." }
+
 git lfs pull origin
+git status --short --branch
 git log -1 --oneline
