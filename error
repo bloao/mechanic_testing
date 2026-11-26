@@ -1,9 +1,27 @@
-git fetch origin main
-if ($LASTEXITCODE -ne 0) { throw "Fetch failed. Stopped before overwriting files." }
-
-git switch --discard-changes -C main FETCH_HEAD
-if ($LASTEXITCODE -ne 0) { throw "Switch failed. Check the Git output above." }
-
-git lfs pull origin
-git status --short --branch
-git log -1 --oneline
+PS C:\Users\hsramin3\mechanic_testing-fresh>
+PS C:\Users\hsramin3\mechanic_testing-fresh> git fetch origin main
+remote: Enumerating objects: 5, done.
+remote: Counting objects: 100% (5/5), done.
+remote: Compressing objects: 100% (3/3), done.
+remote: Total 3 (delta 1), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (3/3), 1.08 KiB | 78.00 KiB/s, done.
+From https://github.com/bloao/mechanic_testing
+ * branch            main       -> FETCH_HEAD
+   24839a2..2224c4f  main       -> origin/main
+PS C:\Users\hsramin3\mechanic_testing-fresh> if ($LASTEXITCODE -ne 0) { throw "Fetch failed. Stopped before overwriting files." }
+PS C:\Users\hsramin3\mechanic_testing-fresh>
+PS C:\Users\hsramin3\mechanic_testing-fresh> git switch --discard-changes -C main FETCH_HEAD
+Updating files: 100% (302/302), done.
+Switched to and reset branch 'main'
+Your branch is up to date with 'origin/main'.
+PS C:\Users\hsramin3\mechanic_testing-fresh> if ($LASTEXITCODE -ne 0) { throw "Switch failed. Check the Git output above." }
+PS C:\Users\hsramin3\mechanic_testing-fresh>
+PS C:\Users\hsramin3\mechanic_testing-fresh> git lfs pull origin
+PS C:\Users\hsramin3\mechanic_testing-fresh> git status --short --branch
+Refresh index: 100% (2206/2206), done.
+## main...origin/main
+?? "Content/Screenshot 2026-11-24 152622.png"
+?? Content/Screenshot_2026-11-24_152622.uasset
+PS C:\Users\hsramin3\mechanic_testing-fresh> git log -1 --oneline
+2224c4f (HEAD -> main, origin/main, origin/HEAD) Update error
+PS C:\Users\hsramin3\mechanic_testing-fresh>
