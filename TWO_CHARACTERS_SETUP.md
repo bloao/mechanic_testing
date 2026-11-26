@@ -29,10 +29,60 @@ meshes and animations, the shared ability base, and the existing companion contr
 - **Tab:** switch. The inactive character receives an AIController and follows.
 - **Agile (Quinn):** two jumps and wall running; cannot smash.
 - **Strong (Manny):** one jump and smash; cannot wall run.
+- **F while Strong is enlarged:** Aim the camera at a nearby
+  `SM_ContainerClosed_Large` and hold F to grab it. While holding F, W pushes and
+  S pulls. To move it along the other axis, release F, walk to another side, and
+  grab it again. Strong and the container stop together when either is blocked.
+  Jumping, switching characters,
+  leaving the ground, or reaching the end of the growth timer releases it.
+  The container needs query collision and physics simulation turned off.
 - **E:** Strong's prototype smash key. It does nothing as Agile. If a Blueprint
   assigns the existing Smash Input Action, bind/map that Enhanced Input action instead.
+- **E at a BP_Terminal:** Only the character you are controlling receives the
+  effect: Strong instantly grows to 125% of his original size, or Agile becomes half
+  her original size, for 20 seconds before returning to normal. The other character's
+  size and timer are unaffected. Using any terminal again refreshes only the
+  interacting character's 20 seconds without stacking the scale changes.
+  Switching characters does not cancel an active effect.
+  This uses the existing terminal Blueprint's `canInteract` gate and E key;
+  its existing container interaction remains connected. No Blueprint rewiring is needed.
+  The shared controller exposes the size multipliers and duration under
+  **Companion > Terminal**. Rebuild the native module in UE 5.6 before testing.
+
+  If both characters still resize, close Unreal Editor, pull the latest `mechanics`
+  branch, rebuild the Editor target from that checkout, then reopen that same
+  `mechanic_testing.uproject`. In Play, filter the Output Log for
+  `LogCompanionTerminal`. The startup line should say
+  `Terminal sizing mode: interacting character only.` A single use by Agile should
+  log one activation for Agile at `0.50x`. The startup line confirms which code
+  the editor loaded.
+
+  In UE 5.6's Automation window, run
+  `MechanicTesting.Companions.TemporarySize` and
+  `MechanicTesting.Companions.TerminalSizeInteraction`. These cover the existing
+  terminal gate, both character roles, timer refresh, restoration of custom original
+  scales, feet height, and character switching. The terminal test requires the
+  project's Blueprint assets to be downloaded with Git LFS.
+  The size implementation has been checked against the UE 5.6 API and build
+  settings; the new automation tests and Play behavior still need verification in
+  a UE 5.6 installation (the authoring machine only has UE 5.3).
 - To wall run, jump while moving close and parallel to a tall static wall. A second
   jump press while wall running pushes away. There is no ground-height restriction.
+
+## Strong's Container Animation
+
+In Manny's Animation Blueprint, read **Is Holding Container** and **Container Move
+Velocity** from the owning `CompanionPlayableCharacter`. Enter the braced state
+while holding and return to locomotion when released. Use the measured container
+velocity's Y value for the lower-body locomotion. Use a 1D Blend Space with
+backward walk at -100, idle at 0, and forward walk at +100. If you already made
+a 2D Blend Space, its X input stays at zero. The speed is zero when blocked or
+when the player stops moving.
+
+Use the imported push Animation Sequence for the upper body in all directions.
+Choose a frame where Manny's hands are planted and use a Sequence Evaluator for
+that pose. Layer it over the in-place locomotion from the first spine bone upward.
+Check that the clip uses Manny's skeleton, or retarget it before assigning it.
 
 ## Test a Breakable
 

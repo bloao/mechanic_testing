@@ -19,10 +19,13 @@
 #include "Navigation/PathFollowingComponent.h"
 #include "NavigationSystem.h"
 #include "UObject/ConstructorHelpers.h"
+#include "UObject/UnrealType.h"
 
 static TAutoConsoleVariable<int32> CVarCompanionFollowDebug(
 	TEXT("companion.Follow.Debug"), 0,
 	TEXT("Log follower route status and missing navigation connections (0/1)."));
+
+DEFINE_LOG_CATEGORY_STATIC(LogCompanionTerminal, Log, All);
 
 ACompanionSwitchPlayerController::ACompanionSwitchPlayerController()
 {
@@ -49,6 +52,7 @@ ACompanionSwitchPlayerController::ACompanionSwitchPlayerController()
 void ACompanionSwitchPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	UE_LOG(LogCompanionTerminal, Display, TEXT("Terminal sizing mode: interacting character only."));
 
 	// The native GameMode owns spawning and explicit role assignment. Discovering
 	// placed template pawns here can replace that pair during level startup.
@@ -76,12 +80,56 @@ void ACompanionSwitchPlayerController::Tick(float DeltaSeconds)
 		SwitchControlledCharacter();
 	}
 
+	if (WasInputKeyJustPressed(TerminalInteractionKey))
+	{
+		TryInteractWithTerminal();
+	}
+
 	TimeSinceLastFollowUpdate += DeltaSeconds;
 	if (TimeSinceLastFollowUpdate >= FollowRefreshInterval)
 	{
 		TimeSinceLastFollowUpdate = 0.0f;
 		UpdateFollowerMove();
 	}
+}
+
+bool ACompanionSwitchPlayerController::TryInteractWithTerminal()
+{
+	ACompanionCharacterBase* InteractingCharacter = Cast<ACompanionCharacterBase>(GetControlledCompanion());
+	if (!IsValid(InteractingCharacter) || GetPawn() != InteractingCharacter)
+	{
+		return false;
+	}
+
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		AActor* Terminal = *It;
+		bool bIsTerminal = false;
+		for (const UClass* Class = Terminal->GetClass(); Class; Class = Class->GetSuperClass())
+		{
+			if (Class->GetPathName() == TEXT("/Game/Blueprints/BP_Terminal.BP_Terminal_C"))
+			{
+				bIsTerminal = true;
+				break;
+			}
+		}
+		if (!bIsTerminal) continue;
+
+		// The existing Blueprint sets this from its player overlap and checks it
+		// on E. Reuse that gate while leaving its container interaction untouched.
+		const FBoolProperty* CanInteract = FindFProperty<FBoolProperty>(Terminal->GetClass(), TEXT("canInteract"));
+		if (CanInteract && CanInteract->GetPropertyValue_InContainer(Terminal))
+		{
+			const bool bIsAgile = InteractingCharacter == GetCompanionAtIndex(AgileCompanionIndex);
+			const float SizeMultiplier = bIsAgile ? AgileTerminalSizeMultiplier : StrongTerminalSizeMultiplier;
+			UE_LOG(LogCompanionTerminal, Display, TEXT("%s (%s) used %s: applying %.2fx size for %.1f seconds."),
+				*GetNameSafe(InteractingCharacter), bIsAgile ? TEXT("Agile") : TEXT("Strong"),
+				*GetNameSafe(Terminal), SizeMultiplier, TerminalSizeDuration);
+			InteractingCharacter->ApplyTemporarySize(SizeMultiplier, TerminalSizeDuration);
+			return true;
+		}
+	}
+	return false;
 }
 
 void ACompanionSwitchPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)

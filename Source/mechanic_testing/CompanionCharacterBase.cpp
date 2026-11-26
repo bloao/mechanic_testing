@@ -3,11 +3,13 @@
 #include "CompanionCharacterMovementComponent.h"
 #include "CollisionQueryParams.h"
 #include "Components/InputComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/EngineTypes.h"
 #include "Engine/World.h"
 #include "EnhancedInputComponent.h"
 #include "InputAction.h"
 #include "SmashableInterface.h"
+#include "TimerManager.h"
 
 ACompanionCharacterBase::ACompanionCharacterBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UCompanionCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
@@ -27,6 +29,56 @@ void ACompanionCharacterBase::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	ApplyJumpSettings();
+}
+
+void ACompanionCharacterBase::ApplyTemporarySize(float SizeMultiplier, float Duration)
+{
+	if (!GetWorld() || !FMath::IsFinite(SizeMultiplier) || SizeMultiplier <= 0.0f
+		|| !FMath::IsFinite(Duration) || Duration <= 0.0f)
+	{
+		return;
+	}
+	if (!bHasTemporarySize)
+	{
+		OriginalActorScale = GetActorScale3D();
+		bHasTemporarySize = true;
+	}
+	SetSizeKeepingFeetPosition(OriginalActorScale * SizeMultiplier);
+	GetWorldTimerManager().SetTimer(SizeRestoreTimer, this,
+		&ACompanionCharacterBase::RestoreOriginalSize, Duration, false);
+}
+
+void ACompanionCharacterBase::RestoreOriginalSize()
+{
+	if (GetWorld())
+	{
+		GetWorldTimerManager().ClearTimer(SizeRestoreTimer);
+	}
+	if (bHasTemporarySize)
+	{
+		SetSizeKeepingFeetPosition(OriginalActorScale);
+		bHasTemporarySize = false;
+	}
+}
+
+bool ACompanionCharacterBase::HasTemporaryGrowth() const
+{
+	return bHasTemporarySize && GetActorScale3D().GetAbsMax() > OriginalActorScale.GetAbsMax();
+}
+
+void ACompanionCharacterBase::SetSizeKeepingFeetPosition(const FVector& NewScale)
+{
+	const float PreviousHalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	SetActorScale3D(NewScale);
+	// Scale the capsule and mesh together, keeping the feet at their current height.
+	const float HeightChange = GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - PreviousHalfHeight;
+	AddActorWorldOffset(FVector(0.0, 0.0, HeightChange));
+}
+
+void ACompanionCharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	GetWorldTimerManager().ClearTimer(SizeRestoreTimer);
+	Super::EndPlay(EndPlayReason);
 }
 
 void ACompanionCharacterBase::ConfigureAgileAbilities(bool bIsAgile, int32 AgileJumpCount)
