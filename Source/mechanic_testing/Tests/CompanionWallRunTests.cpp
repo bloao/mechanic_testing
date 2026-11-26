@@ -1020,6 +1020,13 @@ bool FCompanionTerminalSizeTest::RunTest(const FString& Parameters)
 		FVector(500.0, 0.0, 500.0), FRotator::ZeroRotator);
 	if (!TestNotNull(TEXT("The companion spawns"), Strong) || !TestNotNull(TEXT("The controller spawns"), Controller)) return false;
 	Controller->SetCompanionPair(TestWorld.Character, Strong);
+	Gate->SetPropertyValue_InContainer(Terminal, true);
+	TestFalse(TEXT("An ordinary BP_Terminal cannot activate ScalX even when interactable"), Controller->TryInteractWithTerminal());
+	TestTrue(TEXT("An ordinary terminal leaves both characters at normal size"),
+		TestWorld.Character->GetActorScale3D().Equals(FVector::OneVector)
+		&& Strong->GetActorScale3D().Equals(FVector::OneVector));
+
+	Terminal->Tags.Add(TEXT("ScalXTerminal"));
 	Gate->SetPropertyValue_InContainer(Terminal, false);
 	TestFalse(TEXT("E cannot activate a terminal outside its interaction gate"), Controller->TryInteractWithTerminal());
 	TestTrue(TEXT("A gated terminal leaves Agile's size unchanged"), TestWorld.Character->GetActorScale3D().Equals(FVector::OneVector));

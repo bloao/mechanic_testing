@@ -38,21 +38,21 @@ meshes and animations, the shared ability base, and the existing companion contr
   The container needs query collision and physics simulation turned off.
 - **E:** Strong's prototype smash key. It does nothing as Agile. If a Blueprint
   assigns the existing Smash Input Action, bind/map that Enhanced Input action instead.
-- **E at a BP_Terminal:** Only the character you are controlling receives the
+- **E at a BP_growterminal:** Only the character you are controlling receives the
   effect: Strong instantly grows to 125% of his original size, or Agile becomes half
   her original size, for 20 seconds before returning to normal. The other character's
-  size and timer are unaffected. Using any terminal again refreshes only the
+  size and timer are unaffected. Using a grow terminal again refreshes only the
   interacting character's 20 seconds without stacking the scale changes.
   Switching characters does not cancel an active effect.
-  The existing terminal Blueprint's `canInteract` gate and container interaction
-  still work. To designate another placed actor as a terminal, select it in the
-  World Outliner and add `ScalXTerminal` under **Details > Actor > Tags**.
-  Play in Editor also recognizes an actor labeled `BP_growterminal`. An actor
-  without a `canInteract` gate can be used from within short reach.
+  Ordinary terminals retain their existing interactions and do not activate
+  ScalX. For packaged builds, add `ScalXTerminal` under **Details > Actor > Tags**
+  on each intended grow terminal whose name is just an Outliner label.
+  Play in Editor also recognizes the `BP_growterminal` label. Grow terminals use
+  their existing `canInteract` gate when available, or short reach otherwise.
   The shared controller exposes the size multipliers and duration under
   **Companion > Terminal**. Rebuild the native module in UE 5.6 before testing.
 
-  If both characters still resize, close Unreal Editor, pull the latest `mechanics`
+  If both characters still resize, close Unreal Editor, pull the latest `main`
   branch, rebuild the Editor target from that checkout, then reopen that same
   `mechanic_testing.uproject`. In Play, filter the Output Log for
   `LogCompanionTerminal`. The startup line should say

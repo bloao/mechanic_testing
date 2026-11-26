@@ -51,18 +51,6 @@ static bool IsGrowTerminal(const AActor& Actor)
 	return false;
 }
 
-static bool IsLegacySizeTerminal(const AActor& Actor)
-{
-	for (const UClass* Class = Actor.GetClass(); Class; Class = Class->GetSuperClass())
-	{
-		if (Class->GetPathName() == TEXT("/Game/Blueprints/BP_Terminal.BP_Terminal_C"))
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
 ACompanionSwitchPlayerController::ACompanionSwitchPlayerController()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -140,8 +128,7 @@ bool ACompanionSwitchPlayerController::TryInteractWithTerminal()
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		AActor* Terminal = *It;
-		const bool bIsGrowTerminal = IsGrowTerminal(*Terminal);
-		if (!bIsGrowTerminal && !IsLegacySizeTerminal(*Terminal))
+		if (!IsGrowTerminal(*Terminal))
 		{
 			continue;
 		}
@@ -163,7 +150,7 @@ bool ACompanionSwitchPlayerController::TryInteractWithTerminal()
 		const UCapsuleComponent* Capsule = InteractingCharacter->GetCapsuleComponent();
 		const FBox Bounds = Terminal->GetComponentsBoundingBox(true);
 		const float MaxDistance = Capsule->GetScaledCapsuleRadius() + InteractionReach;
-		if (bIsGrowTerminal && Bounds.IsValid
+		if (Bounds.IsValid
 			&& Bounds.ComputeSquaredDistanceToPoint(Capsule->GetComponentLocation()) <= FMath::Square(MaxDistance))
 		{
 			ApplyTerminalSize(*Terminal, *InteractingCharacter);
