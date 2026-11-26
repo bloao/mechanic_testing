@@ -27,6 +27,42 @@ static TAutoConsoleVariable<int32> CVarCompanionFollowDebug(
 
 DEFINE_LOG_CATEGORY_STATIC(LogCompanionTerminal, Log, All);
 
+static bool IsGrowTerminal(const AActor& Actor)
+{
+	static const FName GrowTerminalTag(TEXT("ScalXTerminal"));
+	static const FName GrowTerminalClassName(TEXT("BP_GrowTerminal_C"));
+	if (Actor.ActorHasTag(GrowTerminalTag))
+	{
+		return true;
+	}
+#if WITH_EDITOR
+	if (Actor.GetActorLabel().Equals(TEXT("BP_growterminal"), ESearchCase::IgnoreCase))
+	{
+		return true;
+	}
+#endif
+	for (const UClass* Class = Actor.GetClass(); Class; Class = Class->GetSuperClass())
+	{
+		if (Class->GetFName() == GrowTerminalClassName)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool IsLegacySizeTerminal(const AActor& Actor)
+{
+	for (const UClass* Class = Actor.GetClass(); Class; Class = Class->GetSuperClass())
+	{
+		if (Class->GetPathName() == TEXT("/Game/Blueprints/BP_Terminal.BP_Terminal_C"))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 ACompanionSwitchPlayerController::ACompanionSwitchPlayerController()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -95,8 +131,8 @@ void ACompanionSwitchPlayerController::Tick(float DeltaSeconds)
 
 bool ACompanionSwitchPlayerController::TryInteractWithTerminal()
 {
-	ACompanionCharacterBase* InteractingCharacter = Cast<ACompanionCharacterBase>(GetControlledCompanion());
-	if (!IsValid(InteractingCharacter) || GetPawn() != InteractingCharacter)
+	ACompanionCharacterBase* InteractingCharacter = Cast<ACompanionCharacterBase>(GetPawn());
+	if (!IsValid(InteractingCharacter) || InteractingCharacter != GetControlledCompanion())
 	{
 		return false;
 	}
@@ -104,32 +140,47 @@ bool ACompanionSwitchPlayerController::TryInteractWithTerminal()
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		AActor* Terminal = *It;
-		bool bIsTerminal = false;
-		for (const UClass* Class = Terminal->GetClass(); Class; Class = Class->GetSuperClass())
+		const bool bIsGrowTerminal = IsGrowTerminal(*Terminal);
+		if (!bIsGrowTerminal && !IsLegacySizeTerminal(*Terminal))
 		{
-			if (Class->GetPathName() == TEXT("/Game/Blueprints/BP_Terminal.BP_Terminal_C"))
-			{
-				bIsTerminal = true;
-				break;
-			}
+			continue;
 		}
-		if (!bIsTerminal) continue;
 
-		// The existing Blueprint sets this from its player overlap and checks it
-		// on E. Reuse that gate while leaving its container interaction untouched.
+		// Blueprint terminals can provide their own interaction gate.
 		const FBoolProperty* CanInteract = FindFProperty<FBoolProperty>(Terminal->GetClass(), TEXT("canInteract"));
-		if (CanInteract && CanInteract->GetPropertyValue_InContainer(Terminal))
+		if (CanInteract)
 		{
-			const bool bIsAgile = InteractingCharacter == GetCompanionAtIndex(AgileCompanionIndex);
-			const float SizeMultiplier = bIsAgile ? AgileTerminalSizeMultiplier : StrongTerminalSizeMultiplier;
-			UE_LOG(LogCompanionTerminal, Display, TEXT("%s (%s) used %s: applying %.2fx size for %.1f seconds."),
-				*GetNameSafe(InteractingCharacter), bIsAgile ? TEXT("Agile") : TEXT("Strong"),
-				*GetNameSafe(Terminal), SizeMultiplier, TerminalSizeDuration);
-			InteractingCharacter->ApplyTemporarySize(SizeMultiplier, TerminalSizeDuration);
+			if (CanInteract->GetPropertyValue_InContainer(Terminal))
+			{
+				ApplyTerminalSize(*Terminal, *InteractingCharacter);
+				return true;
+			}
+			continue;
+		}
+
+		// A designated mesh or actor without its own Blueprint gate uses short reach.
+		constexpr float InteractionReach = 100.0f;
+		const UCapsuleComponent* Capsule = InteractingCharacter->GetCapsuleComponent();
+		const FBox Bounds = Terminal->GetComponentsBoundingBox(true);
+		const float MaxDistance = Capsule->GetScaledCapsuleRadius() + InteractionReach;
+		if (bIsGrowTerminal && Bounds.IsValid
+			&& Bounds.ComputeSquaredDistanceToPoint(Capsule->GetComponentLocation()) <= FMath::Square(MaxDistance))
+		{
+			ApplyTerminalSize(*Terminal, *InteractingCharacter);
 			return true;
 		}
 	}
 	return false;
+}
+
+void ACompanionSwitchPlayerController::ApplyTerminalSize(const AActor& Terminal, ACompanionCharacterBase& InteractingCharacter)
+{
+	const bool bIsAgile = &InteractingCharacter == GetCompanionAtIndex(AgileCompanionIndex);
+	const float SizeMultiplier = bIsAgile ? AgileTerminalSizeMultiplier : StrongTerminalSizeMultiplier;
+	UE_LOG(LogCompanionTerminal, Display, TEXT("%s (%s) used %s: applying %.2fx size for %.1f seconds."),
+		*InteractingCharacter.GetName(), bIsAgile ? TEXT("Agile") : TEXT("Strong"),
+		*Terminal.GetName(), SizeMultiplier, TerminalSizeDuration);
+	InteractingCharacter.ApplyTemporarySize(SizeMultiplier, TerminalSizeDuration);
 }
 
 void ACompanionSwitchPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)

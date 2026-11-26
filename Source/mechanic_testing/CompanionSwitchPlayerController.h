@@ -5,6 +5,7 @@
 #include "InputCoreTypes.h"
 #include "CompanionSwitchPlayerController.generated.h"
 
+class ACompanionCharacterBase;
 class AAIController;
 class ACharacter;
 class ATargetPoint;
@@ -31,7 +32,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Companion")
 	void SwitchControlledCharacter();
 
-	/** Uses BP_Terminal's existing canInteract gate; also callable from Blueprint. */
+	/** Tries to use a nearby ScalX terminal. */
 	UFUNCTION(BlueprintCallable, Category = "Companion|Terminal")
 	bool TryInteractWithTerminal();
 
@@ -91,6 +92,7 @@ protected:
 	bool bLogCompanionSetup;
 
 private:
+	void ApplyTerminalSize(const AActor& Terminal, ACompanionCharacterBase& InteractingCharacter);
 	friend class FCompanionAirborneFollowTest;
 
 	UPROPERTY(Transient)

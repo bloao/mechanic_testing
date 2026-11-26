@@ -44,8 +44,11 @@ meshes and animations, the shared ability base, and the existing companion contr
   size and timer are unaffected. Using any terminal again refreshes only the
   interacting character's 20 seconds without stacking the scale changes.
   Switching characters does not cancel an active effect.
-  This uses the existing terminal Blueprint's `canInteract` gate and E key;
-  its existing container interaction remains connected. No Blueprint rewiring is needed.
+  The existing terminal Blueprint's `canInteract` gate and container interaction
+  still work. To designate another placed actor as a terminal, select it in the
+  World Outliner and add `ScalXTerminal` under **Details > Actor > Tags**.
+  Play in Editor also recognizes an actor labeled `BP_growterminal`. An actor
+  without a `canInteract` gate can be used from within short reach.
   The shared controller exposes the size multipliers and duration under
   **Companion > Terminal**. Rebuild the native module in UE 5.6 before testing.
 
