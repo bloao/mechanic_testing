@@ -1,22 +1,5 @@
-PS C:\Users\hsramin3\mechanic_testing-fresh> git pull --ff-only origin main
-From https://github.com/bloao/mechanic_testing
- * branch            main       -> FETCH_HEAD
-Updating d87c448..4202230
-error: Your local changes to the following files would be overwritten by merge:
-        Content/ThirdPerson/LVL_level2.umap
-Please commit your changes or stash them before you merge.
-Aborting
-PS C:\Users\hsramin3\mechanic_testing-fresh>
-PS C:\Users\hsramin3\mechanic_testing-fresh> $ProjectFile = Join-Path (Get-Location).Path "mechanic_testing.uproject"
-PS C:\Users\hsramin3\mechanic_testing-fresh>
-PS C:\Users\hsramin3\mechanic_testing-fresh> & "C:\Program Files\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat" mechanic_testingEditor Win64 Development "-Project=$ProjectFile" -WaitMutex -NoEngineChanges -NoHotReloadFromIDE -NoUBA -NoUBALocal
-Using bundled DotNet SDK version: 8.0.300 win-x64
-Running UnrealBuildTool: dotnet "..\..\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.dll" mechanic_testingEditor Win64 Development -Project=C:\Users\hsramin3\mechanic_testing-fresh\mechanic_testing.uproject -WaitMutex -NoEngineChanges -NoHotReloadFromIDE -NoUBA -NoUBALocal
-Log file: C:\Users\hsramin3\AppData\Local\UnrealBuildTool\Log.txt
-Using 'git status' to determine working set for adaptive non-unity build (C:\Users\hsramin3\mechanic_testing-fresh).
-Waiting for 'git status' command to complete
-Target is up to date
-
-Result: Succeeded
-Total execution time: 1.54 seconds
-PS C:\Users\hsramin3\mechanic_testing-fresh>
+git fetch origin main
+git worktree add --detach ..\mechanic_testing-main-check FETCH_HEAD
+cd ..\mechanic_testing-main-check
+git lfs pull origin
+git log -1 --oneline
