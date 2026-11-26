@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "TimerManager.h"
 #include "CompanionCharacterBase.generated.h"
 
 class UInputAction;
@@ -19,6 +20,14 @@ public:
 	virtual void Jump() override;
 	virtual void StopJumping() override;
 	virtual void UnPossessed() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	/** Reapplying refreshes the timer and uses the original size, without stacking. */
+	UFUNCTION(BlueprintCallable, Category = "Abilities|Size")
+	void ApplyTemporarySize(float SizeMultiplier, float Duration = 20.0f);
+
+	UFUNCTION(BlueprintCallable, Category = "Abilities|Size")
+	void RestoreOriginalSize();
 
 	UFUNCTION(BlueprintCallable, Category = "Abilities")
 	virtual void ConfigureAgileAbilities(bool bIsAgile, int32 AgileJumpCount = 2);
@@ -30,6 +39,8 @@ public:
 	bool CanPerformSmash() const;
 
 protected:
+	bool HasTemporaryGrowth() const;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Abilities|Jump")
 	bool bCanDoubleJump;
 
@@ -55,6 +66,12 @@ protected:
 	void BP_OnSmashPerformed(bool bHitBreakable);
 
 private:
+	FTimerHandle SizeRestoreTimer;
+	FVector OriginalActorScale = FVector::OneVector;
+	bool bHasTemporarySize = false;
+
+	void SetSizeKeepingFeetPosition(const FVector& NewScale);
+
 	double LastSmashTime;
 	bool bJumpInputHeld = false;
 

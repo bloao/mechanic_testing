@@ -27,6 +27,9 @@
 #include "NavigationSystem.h"
 #include "NavMesh/NavMeshBoundsVolume.h"
 #include "NavLinkCustomComponent.h"
+#include "TimerManager.h"
+#include "UObject/Package.h"
+#include "UObject/UnrealType.h"
 
 namespace CompanionWallRunTests
 {
@@ -825,6 +828,18 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionLevelIntegrationTest,
 bool FCompanionLevelIntegrationTest::RunTest(const FString& Parameters)
 {
 	using namespace CompanionWallRunTests;
+	// The main maps use a Blueprint GameInstance for level transitions. The
+	// module must supply companion defaults without relying on our old instance.
+	const FString PackageName = TEXT("/Game/Tests/CompanionStartup_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	const UWorld::InitializationValues StartupValues = UWorld::InitializationValues()
+		.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false).CreateFXSystem(false);
+	UWorld* StartupWorld = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, CreatePackage(*PackageName),
+		true, ERHIFeatureLevel::Num, &StartupValues);
+	if (!TestNotNull(TEXT("A project gameplay world initializes"), StartupWorld)) return false;
+	TestEqual(TEXT("Project worlds select the companion GameMode without requiring a custom GameInstance"),
+		StartupWorld->GetWorldSettings()->DefaultGameMode.Get(), ACompanionGameMode::StaticClass());
+	StartupWorld->DestroyWorld(false);
+
 	FTestWorld TestWorld(0.0f);
 	UCompanionGameInstance* Instance = NewObject<UCompanionGameInstance>();
 	TestWorld.World->GetWorldSettings()->DefaultGameMode = AGameModeBase::StaticClass();
@@ -934,4 +949,96 @@ bool FCompanionWallRunWorldGeometryTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionTemporarySizeTest,
+	"MechanicTesting.Companions.TemporarySize", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionTemporarySizeTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	FTestWorld TestWorld(0.0f);
+	ACompanionCharacterBase* Agile = TestWorld.Character;
+	ACompanionCharacterBase* Strong = TestWorld.World->SpawnActor<ACompanionCharacterBase>(
+		FVector(500.0, 0.0, 500.0), FRotator::ZeroRotator);
+	if (!TestNotNull(TEXT("The strong companion spawns"), Strong)) return false;
+	Strong->ConfigureAgileAbilities(false);
+	// Non-default sizes must be restored exactly, rather than reset to (1,1,1).
+	Agile->SetActorScale3D(FVector(0.8));
+	Strong->SetActorScale3D(FVector(1.2));
+	const FVector AgileFeet = Agile->GetCharacterMovement()->GetActorFeetLocation();
+	const FVector StrongFeet = Strong->GetCharacterMovement()->GetActorFeetLocation();
+	FTimerManager& Timers = TestWorld.World->GetTimerManager();
+	TGuardValue<uint64> RestoreFrameCounter(GFrameCounter, GFrameCounter);
+	const auto AdvanceTimers = [&](float Seconds)
+	{
+		++GFrameCounter;
+		Timers.Tick(Seconds);
+	};
+	AdvanceTimers(0.0f);
+	Agile->ApplyTemporarySize(0.5f);
+	Strong->ApplyTemporarySize(2.0f);
+	TestTrue(TEXT("Agile immediately shrinks"), Agile->GetActorScale3D().Equals(FVector(0.4)));
+	TestTrue(TEXT("Strong immediately grows"), Strong->GetActorScale3D().Equals(FVector(2.4)));
+	TestTrue(TEXT("Shrinking keeps Agile's feet in place"), Agile->GetCharacterMovement()->GetActorFeetLocation().Equals(AgileFeet));
+	TestTrue(TEXT("Growing keeps Strong's feet in place"), Strong->GetCharacterMovement()->GetActorFeetLocation().Equals(StrongFeet));
+	AdvanceTimers(10.0f);
+	Agile->ApplyTemporarySize(0.5f);
+	Strong->ApplyTemporarySize(2.0f);
+	TestTrue(TEXT("Repeat use does not compound shrinking"), Agile->GetActorScale3D().Equals(FVector(0.4)));
+	TestTrue(TEXT("Repeat use does not compound growing"), Strong->GetActorScale3D().Equals(FVector(2.4)));
+	// Possession changes must not cancel either character's restoration timer.
+	TestWorld.Player->Possess(Strong);
+	AdvanceTimers(10.1f);
+	TestTrue(TEXT("Agile stays small past the original expiry"), Agile->GetActorScale3D().Equals(FVector(0.4)));
+	TestTrue(TEXT("Strong stays large past the original expiry"), Strong->GetActorScale3D().Equals(FVector(2.4)));
+	AdvanceTimers(10.0f);
+	TestTrue(TEXT("Agile restores its original scale after the refreshed 20 seconds"), Agile->GetActorScale3D().Equals(FVector(0.8)));
+	TestTrue(TEXT("Strong restores its original scale after the refreshed 20 seconds"), Strong->GetActorScale3D().Equals(FVector(1.2)));
+	TestTrue(TEXT("Agile's feet remain in place after restoring"), Agile->GetCharacterMovement()->GetActorFeetLocation().Equals(AgileFeet));
+	TestTrue(TEXT("Strong's feet remain in place after restoring"), Strong->GetCharacterMovement()->GetActorFeetLocation().Equals(StrongFeet));
+	Agile->ApplyTemporarySize(0.0f);
+	Strong->ApplyTemporarySize(2.0f, 0.0f);
+	TestTrue(TEXT("Invalid sizes leave Agile unchanged"), Agile->GetActorScale3D().Equals(FVector(0.8)));
+	TestTrue(TEXT("Invalid durations leave Strong unchanged"), Strong->GetActorScale3D().Equals(FVector(1.2)));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCompanionTerminalSizeTest,
+	"MechanicTesting.Companions.TerminalSizeInteraction", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCompanionTerminalSizeTest::RunTest(const FString& Parameters)
+{
+	using namespace CompanionWallRunTests;
+	FTestWorld TestWorld(0.0f);
+	UClass* TerminalClass = LoadClass<AActor>(nullptr, TEXT("/Game/Blueprints/BP_Terminal.BP_Terminal_C"));
+	if (!TestNotNull(TEXT("The shipped terminal Blueprint is available"), TerminalClass)) return false;
+	AActor* Terminal = TestWorld.World->SpawnActor<AActor>(TerminalClass);
+	if (!TestNotNull(TEXT("The terminal spawns"), Terminal)) return false;
+	FBoolProperty* Gate = FindFProperty<FBoolProperty>(TerminalClass, TEXT("canInteract"));
+	if (!TestNotNull(TEXT("The terminal retains its existing interaction gate"), Gate)) return false;
+	ACompanionSwitchPlayerController* Controller = TestWorld.World->SpawnActor<ACompanionSwitchPlayerController>();
+	ACompanionCharacterBase* Strong = TestWorld.World->SpawnActor<ACompanionCharacterBase>(
+		FVector(500.0, 0.0, 500.0), FRotator::ZeroRotator);
+	if (!TestNotNull(TEXT("The companion spawns"), Strong) || !TestNotNull(TEXT("The controller spawns"), Controller)) return false;
+	Controller->SetCompanionPair(TestWorld.Character, Strong);
+	Gate->SetPropertyValue_InContainer(Terminal, false);
+	TestFalse(TEXT("E cannot activate a terminal outside its interaction gate"), Controller->TryInteractWithTerminal());
+	TestTrue(TEXT("A gated terminal leaves Agile's size unchanged"), TestWorld.Character->GetActorScale3D().Equals(FVector::OneVector));
+	Gate->SetPropertyValue_InContainer(Terminal, true);
+	TestTrue(TEXT("The terminal's existing interaction gate enables resizing"), Controller->TryInteractWithTerminal());
+	TestTrue(TEXT("Terminal interaction shrinks Agile"), TestWorld.Character->GetActorScale3D().Equals(FVector(0.5)));
+	TestTrue(TEXT("Agile's interaction leaves Strong unchanged"), Strong->GetActorScale3D().Equals(FVector::OneVector));
+	TestWorld.Character->RestoreOriginalSize();
+	Controller->SwitchControlledCharacter();
+	Gate->SetPropertyValue_InContainer(Terminal, true);
+	TestTrue(TEXT("Strong can use the terminal too"), Controller->TryInteractWithTerminal());
+	TestTrue(TEXT("Strong's interaction grows only Strong to 125% scale"), Strong->GetActorScale3D().Equals(FVector(1.25))
+		&& TestWorld.Character->GetActorScale3D().Equals(FVector::OneVector));
+	Controller->SwitchControlledCharacter();
+	Gate->SetPropertyValue_InContainer(Terminal, true);
+	TestTrue(TEXT("Agile can activate her ability while Strong's is already active"), Controller->TryInteractWithTerminal());
+	Strong->RestoreOriginalSize();
+	TestTrue(TEXT("Restoring Strong leaves Agile's independent effect active"), Strong->GetActorScale3D().Equals(FVector::OneVector)
+		&& TestWorld.Character->GetActorScale3D().Equals(FVector(0.5)));
+	return true;
+}
 #endif

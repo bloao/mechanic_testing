@@ -31,6 +31,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Companion")
 	void SwitchControlledCharacter();
 
+	/** Uses BP_Terminal's existing canInteract gate; also callable from Blueprint. */
+	UFUNCTION(BlueprintCallable, Category = "Companion|Terminal")
+	bool TryInteractWithTerminal();
+
 	UFUNCTION(BlueprintPure, Category = "Companion")
 	ACharacter* GetControlledCompanion() const;
 
@@ -38,6 +42,18 @@ public:
 	ACharacter* GetFollowerCompanion() const;
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Companion|Terminal")
+	FKey TerminalInteractionKey = EKeys::E;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Companion|Terminal", meta = (ClampMin = "0.01", Units = "s"))
+	float TerminalSizeDuration = 20.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Companion|Terminal", meta = (ClampMin = "0.01"))
+	float StrongTerminalSizeMultiplier = 1.25f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Companion|Terminal", meta = (ClampMin = "0.01"))
+	float AgileTerminalSizeMultiplier = 0.5f;
+
 	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "Companion", meta = (ToolTip = "Optional explicit pair of characters. If empty, the controller can discover characters by tag."))
 	TArray<ACharacter*> CompanionCharacters;
 
